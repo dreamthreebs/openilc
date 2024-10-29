@@ -1,0 +1,9 @@
+/**/*.npz
+/**/*.npy
+/**/*.fits
+/**/*.log
+/**/*.pkl
+/**/__pycache__
+/test_data
+nilc_dev.py
+/**/nilc_weight
