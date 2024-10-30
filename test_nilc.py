@@ -39,14 +39,14 @@ def gen_sim():
 def test_nilc():
     # do nilc and save the weights
     sim = np.load('./test_data/sim_cf.npy')
-    obj_nilc = NILC(weights_name='./nilc_weight/test.npz', Sm_maps=sim, mask=None, lmax=lmax, nside=nside)
+    obj_nilc = NILC(weights_name='./nilc_weight/test.npz', Sm_maps=sim, mask=None, lmax=lmax, nside=nside, n_iter=1)
     clean_map = obj_nilc.run_nilc()
     np.save('./test_data/cln_cmb.npy', clean_map)
 
 def get_fg_res():
     # this function tells you how to debias other component by using the weights
     fg = np.load('./test_data/sim_f.npy')
-    obj_nilc = NILC(weights_config='./nilc_weight/test.npz', Sm_maps=fg, mask=None, lmax=lmax, nside=nside)
+    obj_nilc = NILC(weights_config='./nilc_weight/test.npz', Sm_maps=fg, mask=None, lmax=lmax, nside=nside, n_iter=1)
     fg_res = obj_nilc.run_nilc()
     np.save('./test_data/fg_res.npy', fg_res)
 

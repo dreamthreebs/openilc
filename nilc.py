@@ -6,11 +6,11 @@ import pandas as pd
 from pathlib import Path
 
 class NILC:
-    def __init__(self, needlet_config='./needlets/default.csv', weights_name=None, weights_config=None, Sm_alms=None, Sm_maps=None, mask=None, lmax=1000, nside=1024, Rtol=1/1000):
+    def __init__(self, needlet_config='./needlets/default.csv', weights_name=None, weights_config=None, Sm_alms=None, Sm_maps=None, mask=None, lmax=1000, nside=1024, Rtol=1/1000, n_iter=3):
 
         """
         Needlets internal linear combination
-        
+
         input Sm_maps should be dimention: (n_freq, n_pixel) or Sm_alms with dimention:(n_freq, n_alm)
 
         """
@@ -33,6 +33,7 @@ class NILC:
 
         self.Rtol = Rtol # theoretical percentage of ilc bias (will change your degree of freedom when calc R covariance matrix)
         self.lmax = lmax # maximum lmax when calculating alm, should be set as the same as needlets last bin's lmax
+        self.n_iter = n_iter
 
         if (weights_config is not None) and (weights_name is not None):
             raise ValueError('weights should not be given and calculated at the same time!')
@@ -51,7 +52,7 @@ class NILC:
 
             Sm_alms_list = []
             for i in range(self.nmaps):
-                Sm_alm = hp.map2alm(self.maps[i], lmax=lmax)
+                Sm_alm = hp.map2alm(self.maps[i], lmax=lmax, iter=self.n_iter)
                 Sm_alms_list.append(Sm_alm)
             self.alms = np.array(Sm_alms_list)
 
@@ -172,7 +173,7 @@ class NILC:
 
         resMap = 0
         for j in range(self.n_needlet):
-            res_alm = hp.map2alm(betaNILC[j])
+            res_alm = hp.map2alm(betaNILC[j], iter=self.n_iter)
             print(f'{res_alm.shape = }')
             res_alm = hp.almxfl(res_alm, self.hl[j])
             print(f'resxflalm = {res_alm.shape}')
