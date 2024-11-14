@@ -9,3 +9,7 @@ needlets internal combination for cmb data analysis
 ## KNOWN ISSUE
 * large memory usage in NILC
 * slow rate when calculating beta covariance matrix in NILC
+
+## FUTURE PLAN
+* use pytest
+* add other ILC

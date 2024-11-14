@@ -5,6 +5,7 @@ import pandas as pd
 
 from pathlib import Path
 from nilc import NILC
+# from memory_profiler import profile
 
 nside = 512
 lmax = 500
@@ -73,9 +74,9 @@ def check_res():
     plt.show()
 
 def main():
-    gen_sim()
+    # gen_sim()
     test_nilc()
-    get_fg_res()
-    check_res()
+    # get_fg_res()
+    # check_res()
 
 main()

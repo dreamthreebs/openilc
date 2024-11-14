@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import healpy as hp
 import pandas as pd
+import gc
 
 from pathlib import Path
 
@@ -54,7 +55,10 @@ class NILC:
             for i in range(self.nmaps):
                 Sm_alm = hp.map2alm(self.maps[i], lmax=lmax, iter=self.n_iter)
                 Sm_alms_list.append(Sm_alm)
-            self.alms = np.array(Sm_alms_list)
+            self.alms = np.asarray(Sm_alms_list)
+
+            del self.maps, Sm_maps
+            gc.collect()
 
         if Sm_alms is not None:
             self.alms = Sm_alms
@@ -97,11 +101,12 @@ class NILC:
             print(f'{beta.shape = }')
         self.beta_list = beta_list
 
-    def calc_R(self):
+    def calc_w(self):
+        oneVec = np.ones(self.nmaps)
         betas = self.beta_list
-        R_list = []
+        w_list = []
         for j in range(self.n_needlet):
-            print(f"calc_R at number:{j}")
+            print(f"calc_weights at number:{j}")
             R_nside = self.needlet.at[j, 'nside']
             R = np.zeros((hp.nside2npix(R_nside), self.nmaps, self.nmaps))
             for c1 in range(self.nmaps):
@@ -121,8 +126,10 @@ class NILC:
                         # print(f"{eps = }")
                         # R[:,c1,c2] = RMap + np.mean(RMap) # for no noise testing
                         R[:,c1,c2] = RMap
-            R_list.append(R)
-        self.R = R_list
+            invR = np.linalg.inv(R)
+            w = (invR@oneVec).T/(oneVec@invR@oneVec + 1e-15)
+            w_list.append(w)
+        self.weights = w_list
 
     def calc_FWHM(self):
         Neff = (self.nmaps - 1) / self.Rtol
@@ -151,17 +158,7 @@ class NILC:
         nside = np.array(self.needlet['nside'])
         self.calc_FWHM()
         print(f'{self.FWHM = }')
-        self.calc_R()
-        R = self.R
-        w_list = []
-        for j in range(self.n_needlet):
-            print(f'calc weight {j}')
-            w_R = R[j]
-            invR = np.linalg.inv(w_R)
-            w = (invR@oneVec).T/(oneVec@invR@oneVec + 1e-15)
-            w_list.append(w)
-        self.weights = w_list
-        print(f'{w = }')
+        self.calc_w()
 
     def calc_ilced_map(self):
         betaNILC = []

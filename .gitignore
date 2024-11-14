@@ -4,7 +4,11 @@
 /**/*.log
 /**/*.pkl
 /**/__pycache__
-/test_data
-nilc_dev.py
 /**/nilc_weight
+/**/submit.sh
+/test_data
 /test
+nilc_dev.py
+nilc_memory.py
+nilc_gpt.py
+
