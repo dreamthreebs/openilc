@@ -127,6 +127,7 @@ class NILC:
 
         print(f"calc_weights at number:{j}")
         R_nside = self.needlet.at[j, 'nside']
+        R_lmax = self.needlet.at[j, 'lmax']
         R = np.zeros((hp.nside2npix(R_nside), self.nmaps, self.nmaps))
         for c1 in range(self.nmaps):
             for c2 in range(c1,self.nmaps):
@@ -147,7 +148,8 @@ class NILC:
                     R[:,c1,c2] = RMap
         invR = np.linalg.inv(R)
         w = (invR@oneVec).T/(oneVec@invR@oneVec + 1e-15)
-        return w
+        alm_w = np.asarray([hp.map2alm(w[i], lmax=R_lmax) for i in range(self.nmaps)])
+        return alm_w
 
     def calc_map(self):
         resMap = 0
@@ -163,11 +165,16 @@ class NILC:
             print(f'calc beta...')
             beta = self.calc_beta_for_scale(j)
 
+            R_nside = self.needlet.at[j, 'nside']
+
             if self.weights_config is None:
                 print(f'calc weight...')
-                ilc_w = self.calc_w_for_scale(j)
+                ilc_w_alm = self.calc_w_for_scale(j)
             else:
-                ilc_w = weights[f'arr_{j}']
+                ilc_w_alm = weights[f'arr_{j}']
+
+            print(f'{ilc_w_alm.shape=}')
+            ilc_w = np.asarray([hp.alm2map(ilc_w_alm[i], nside=R_nside) for i in range(self.nmaps)])
 
             print(f'{ilc_w.shape=}')
 
@@ -181,7 +188,7 @@ class NILC:
             resMap = resMap + ilced_Map
 
             if self.weights_config is None:
-                weight_list.append(ilc_w)
+                weight_list.append(ilc_w_alm)
                 self.weights = weight_list
         return resMap
 

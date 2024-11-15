@@ -44,7 +44,8 @@ def test_nilc():
     sim = np.load('./test_data/sim_cf.npy')
     obj_nilc = NILC(weights_name='./nilc_weight/test.npz', Sm_maps=sim, mask=None, lmax=lmax, nside=nside, n_iter=1)
     clean_map = obj_nilc.run_nilc()
-    np.save('./test_data/cln_cmb.npy', clean_map)
+    # np.save('./test_data/cln_cmb.npy', clean_map)
+    np.save('./test_data/cln_cmb_dev.npy', clean_map)
     print(f'{time.time()-time0=}')
 
 def get_fg_res():
@@ -52,7 +53,7 @@ def get_fg_res():
     fg = np.load('./test_data/sim_f.npy')
     obj_nilc = NILC(weights_config='./nilc_weight/test.npz', Sm_maps=fg, mask=None, lmax=lmax, nside=nside, n_iter=1)
     fg_res = obj_nilc.run_nilc()
-    np.save('./test_data/fg_res.npy', fg_res)
+    np.save('./test_data/fg_res_dev.npy', fg_res)
 
 def check_res():
     # check result compared with input and the foreground residual
@@ -67,9 +68,19 @@ def check_res():
     fg_res = np.load('./test_data/fg_res.npy')
     cl_fgres = hp.anafast(fg_res, lmax=lmax)
 
+    cln_cmb_dev = np.load('./test_data/cln_cmb_dev.npy')
+    cl_cln_dev = hp.anafast(cln_cmb_dev, lmax=lmax)
+
+    fg_res_dev = np.load('./test_data/fg_res_dev.npy')
+    cl_fgres_dev = hp.anafast(fg_res_dev, lmax=lmax)
+
     plt.loglog(l*(l+1)*cl_cmb/(2*np.pi), label='input cmb')
     plt.loglog(l*(l+1)*cl_cln/(2*np.pi), label='after nilc')
     plt.loglog(l*(l+1)*cl_fgres/(2*np.pi), label='foreground residual')
+
+    plt.loglog(l*(l+1)*cl_cln_dev/(2*np.pi), label='after nilc dev')
+    plt.loglog(l*(l+1)*cl_fgres_dev/(2*np.pi), label='foreground residual dev')
+
     plt.xlabel('$\\ell$')
     plt.ylabel('$D_\\ell [\mu K^2]$')
 
@@ -79,7 +90,7 @@ def check_res():
 def main():
     # gen_sim()
     test_nilc()
-    # get_fg_res()
-    # check_res()
+    get_fg_res()
+    check_res()
 
 main()
