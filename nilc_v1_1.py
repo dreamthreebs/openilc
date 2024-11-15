@@ -72,19 +72,64 @@ class NILC:
     def calc_hl(self):
         hl = np.zeros((self.n_needlet, self.lmax+1))
         l_range = np.arange(self.lmax+1)
-        for j in range(self.n_needlet):
-            nlmax = self.needlet.at[j,'lmax']
-            nlmin = self.needlet.at[j,'lmin']
-            nlpeak = self.needlet.at[j,'lpeak']
+        for i in range(self.n_needlet):
+            nlmax = self.needlet.at[i,'lmax']
+            nlmin = self.needlet.at[i,'lmin']
+            nlpeak = self.needlet.at[i,'lpeak']
 
             condition1 = (l_range < nlmin) | (l_range > nlmax)
             condition2 = l_range < nlpeak
             condition3 = l_range > nlpeak
             eps=1e-15
-            hl[j] = np.where(condition1, 0,
+            hl[i] = np.where(condition1, 0,
                        np.where(condition2, np.cos(((nlpeak-l_range)/(nlpeak-nlmin+eps)) * np.pi/2),
                        np.where(condition3, np.cos(((l_range-nlpeak)/(nlmax-nlpeak+eps)) * np.pi/2), 1)))
         self.hl = hl
+
+    def calc_beta(self):
+        hl = self.hl
+        beta_list = []
+        for j in range(self.n_needlet):
+            beta_nside = self.needlet.at[j, 'nside']
+            beta_npix = hp.nside2npix(beta_nside)
+            beta = np.zeros((self.nmaps, beta_npix))
+            for i in range(self.nmaps):
+                beta_alm_ori = hp.almxfl(self.alms[i], self.hl[j])
+                beta[i] = hp.alm2map(beta_alm_ori, beta_nside)
+
+            beta_list.append(beta)
+            print(f'{beta.shape = }')
+        self.beta_list = beta_list
+
+    def calc_w(self):
+        oneVec = np.ones(self.nmaps)
+        betas = self.beta_list
+        w_list = []
+        for j in range(self.n_needlet):
+            print(f"calc_weights at number:{j}")
+            R_nside = self.needlet.at[j, 'nside']
+            R = np.zeros((hp.nside2npix(R_nside), self.nmaps, self.nmaps))
+            for c1 in range(self.nmaps):
+                for c2 in range(c1,self.nmaps):
+                    prodMap = betas[j][c1] * betas[j][c2]
+                    # hp.mollview(prodMap, norm='hist', title = f"{j = }, {c1 = }, {c2 = }")
+                    # plt.show()
+                    RMap = hp.smoothing(prodMap, np.deg2rad(self.FWHM[j]),iter=0)
+                    # hp.mollview(np.abs(RMap), norm='log',title = f"{c1 = }, {c2 = }")
+                    # plt.show()
+                    if c1 != c2:
+                        R[:,c1,c2] = RMap
+                        R[:,c2,c1] = RMap
+                    else:
+                        # eps = 0.1 * np.min(np.abs(RMap))
+                        # R[:,c1,c2] = RMap + eps # for no noise testing
+                        # print(f"{eps = }")
+                        # R[:,c1,c2] = RMap + np.mean(RMap) # for no noise testing
+                        R[:,c1,c2] = RMap
+            invR = np.linalg.inv(R)
+            w = (invR@oneVec).T/(oneVec@invR@oneVec + 1e-15)
+            w_list.append(w)
+        self.weights = w_list
 
     def calc_FWHM(self):
         Neff = (self.nmaps - 1) / self.Rtol
@@ -108,94 +153,43 @@ class NILC:
             FWHM[j] = np.sqrt(8 * np.log(2)) * theta
         self.FWHM = FWHM
 
-    def calc_beta_for_scale(self, j):
-        hl = self.hl[j]
-        beta_nside = self.needlet.at[j, 'nside']
-        beta_npix = hp.nside2npix(beta_nside)
-        beta = np.zeros((self.nmaps, beta_npix))
-        for i in range(self.nmaps):
-            beta_alm_ori = hp.almxfl(self.alms[i], self.hl[j])
-            beta[i] = hp.alm2map(beta_alm_ori, beta_nside)
-
-        print(f'{beta.shape = }')
-        return beta
-
-    def calc_w_for_scale(self, j):
+    def calc_weight(self, **kwargs):
         oneVec = np.ones(self.nmaps)
-        w_list = []
-        beta = self.calc_beta_for_scale(j)
+        nside = np.array(self.needlet['nside'])
+        self.calc_FWHM()
+        print(f'{self.FWHM = }')
+        self.calc_w()
 
-        print(f"calc_weights at number:{j}")
-        R_nside = self.needlet.at[j, 'nside']
-        R = np.zeros((hp.nside2npix(R_nside), self.nmaps, self.nmaps))
-        for c1 in range(self.nmaps):
-            for c2 in range(c1,self.nmaps):
-                prodMap = beta[c1] * beta[c2]
-                # hp.mollview(prodMap, norm='hist', title = f"{j = }, {c1 = }, {c2 = }")
-                # plt.show()
-                RMap = hp.smoothing(prodMap, np.deg2rad(self.FWHM[j]),iter=0)
-                # hp.mollview(np.abs(RMap), norm='log',title = f"{c1 = }, {c2 = }")
-                # plt.show()
-                if c1 != c2:
-                    R[:,c1,c2] = RMap
-                    R[:,c2,c1] = RMap
-                else:
-                    # eps = 0.1 * np.min(np.abs(RMap))
-                    # R[:,c1,c2] = RMap + eps # for no noise testing
-                    # print(f"{eps = }")
-                    # R[:,c1,c2] = RMap + np.mean(RMap) # for no noise testing
-                    R[:,c1,c2] = RMap
-        invR = np.linalg.inv(R)
-        w = (invR@oneVec).T/(oneVec@invR@oneVec + 1e-15)
-        return w
-
-    def calc_map(self):
+    def calc_ilced_map(self):
         resMap = 0
-
-        if self.weights_config is None:
-            weight_list = []
-        else:
-            print('weight are given...')
-            weights = np.load(self.weights_config)
-
         for j in range(self.n_needlet):
-            print(f'begin calculation at scale {j}')
-            print(f'calc beta...')
-            beta = self.calc_beta_for_scale(j)
-
-            if self.weights_config is None:
-                print(f'calc weight...')
-                ilc_w = self.calc_w_for_scale(j)
-            else:
-                ilc_w = weights[f'arr_{j}']
-
-            res  = np.sum(beta * ilc_w, axis=0)
-            print(f'calc ilc beta...')
-            res_alm = hp.map2alm(res, iter=self.n_iter)
+            ilc_Beta = self.beta_list[j]
+            ilc_w    = self.weights[j]
+            beta_nilc  = np.sum(ilc_Beta * ilc_w, axis=0)
+            res_alm = hp.map2alm(beta_nilc, iter=self.n_iter)
             print(f'{res_alm.shape = }')
             res_alm = hp.almxfl(res_alm, self.hl[j])
-            print(f'after resxflalm shape = {res_alm.shape}')
+            print(f'resxflalm = {res_alm.shape}')
             ilced_Map = hp.alm2map(res_alm, self.nside)
             resMap = resMap + ilced_Map
-
-            if self.weights_config is None:
-                weight_list.append(ilc_w)
-                self.weights = weight_list
         return resMap
 
     def run_nilc(self):
         print('calc_hl...')
         self.calc_hl()
-        print('calc_FWHM...')
-        self.calc_FWHM()
-
-        res_map = self.calc_map()
-
+        print('calc_beta...')
+        self.calc_beta()
         if self.weights_config is None:
+            print('calc_weight...')
+            self.calc_weight()
             np.savez(self.weights_name, *self.weights)
-
-        print('Calculation completed!')
-
+        else:
+            print('weight are given...')
+            self.weights = []
+            for j in range(self.n_needlet):
+                weights = np.load(self.weights_config)
+                self.weights.append(weights[f'arr_{j}'])
+        print('calc_ilced_map...')
+        res_map = self.calc_ilced_map()
         return res_map
-
 

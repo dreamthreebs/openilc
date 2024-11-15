@@ -9,6 +9,7 @@
 /test_data
 /test
 nilc_dev.py
+nilc_v0.py
 nilc_memory.py
 nilc_gpt.py
 

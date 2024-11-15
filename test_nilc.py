@@ -2,10 +2,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import healpy as hp
 import pandas as pd
+import time
 
 from pathlib import Path
 from nilc import NILC
-# from memory_profiler import profile
+from memory_profiler import profile
 
 nside = 512
 lmax = 500
@@ -39,10 +40,12 @@ def gen_sim():
 
 def test_nilc():
     # do nilc and save the weights
+    time0 = time.time()
     sim = np.load('./test_data/sim_cf.npy')
     obj_nilc = NILC(weights_name='./nilc_weight/test.npz', Sm_maps=sim, mask=None, lmax=lmax, nside=nside, n_iter=1)
     clean_map = obj_nilc.run_nilc()
     np.save('./test_data/cln_cmb.npy', clean_map)
+    print(f'{time.time()-time0=}')
 
 def get_fg_res():
     # this function tells you how to debias other component by using the weights
