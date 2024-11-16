@@ -7,7 +7,7 @@ import gc
 from pathlib import Path
 
 class NILC:
-    def __init__(self, needlet_config='./needlets/default.csv', weights_name=None, weights_config=None, Sm_alms=None, Sm_maps=None, mask=None, lmax=1000, nside=1024, Rtol=1/1000, n_iter=3):
+    def __init__(self, needlet_config='./needlets/default.csv', weights_name=None, weights_config=None, Sm_alms=None, Sm_maps=None, mask=None, lmax=1000, nside=1024, Rtol=1/1000, n_iter=3, weight_in_alm=True):
 
         """
         Needlets internal linear combination
@@ -18,6 +18,7 @@ class NILC:
 
         self.needlet = pd.read_csv(needlet_config) # load cosine needlets config
         self.n_needlet = len(self.needlet) # number of needlets bin
+        self.weight_in_alm = weight_in_alm # save weight to alm or maps
 
         if weights_name is not None:
             if Path(weights_name).suffix != '.npz':
@@ -34,7 +35,7 @@ class NILC:
 
         self.Rtol = Rtol # theoretical percentage of ilc bias (will change your degree of freedom when calc R covariance matrix)
         self.lmax = lmax # maximum lmax when calculating alm, should be set as the same as needlets last bin's lmax
-        self.n_iter = n_iter
+        self.n_iter = n_iter # iteration number when calculating alm
 
         if (weights_config is not None) and (weights_name is not None):
             raise ValueError('weights should not be given and calculated at the same time!')
@@ -127,6 +128,7 @@ class NILC:
 
         print(f"calc_weights at number:{j}")
         R_nside = self.needlet.at[j, 'nside']
+        R_lmax = self.needlet.at[j, 'lmax']
         R = np.zeros((hp.nside2npix(R_nside), self.nmaps, self.nmaps))
         for c1 in range(self.nmaps):
             for c2 in range(c1,self.nmaps):
@@ -146,7 +148,11 @@ class NILC:
                     # R[:,c1,c2] = RMap + np.mean(RMap) # for no noise testing
                     R[:,c1,c2] = RMap
         invR = np.linalg.inv(R)
-        w = (invR@oneVec).T/(oneVec@invR@oneVec + 1e-15)
+        if self.weight_in_alm:
+            w_map = (invR@oneVec).T/(oneVec@invR@oneVec + 1e-15)
+            w = np.asarray([hp.map2alm(w_map[i], lmax=R_lmax) for i in range(self.nmaps)])
+        else:
+            w = (invR@oneVec).T/(oneVec@invR@oneVec + 1e-15)
         return w
 
     def calc_map(self):
@@ -163,11 +169,22 @@ class NILC:
             print(f'calc beta...')
             beta = self.calc_beta_for_scale(j)
 
-            if self.weights_config is None:
-                print(f'calc weight...')
-                ilc_w = self.calc_w_for_scale(j)
+            R_nside = self.needlet.at[j, 'nside']
+
+            if self.weight_in_alm:
+                if self.weights_config is None:
+                    print(f'calc weight...')
+                    ilc_w_alm = self.calc_w_for_scale(j)
+                else:
+                    ilc_w_alm = weights[f'arr_{j}']
+                print(f'{ilc_w_alm.shape=}')
+                ilc_w = np.asarray([hp.alm2map(ilc_w_alm[i], nside=R_nside) for i in range(self.nmaps)])
             else:
-                ilc_w = weights[f'arr_{j}']
+                if self.weights_config is None:
+                    print(f'calc weight...')
+                    ilc_w = self.calc_w_for_scale(j)
+                else:
+                    ilc_w = weights[f'arr_{j}']
 
             print(f'{ilc_w.shape=}')
 
@@ -181,7 +198,10 @@ class NILC:
             resMap = resMap + ilced_Map
 
             if self.weights_config is None:
-                weight_list.append(ilc_w)
+                if self.weight_in_alm:
+                    weight_list.append(ilc_w_alm)
+                else:
+                    weight_list.append(ilc_w)
                 self.weights = weight_list
         return resMap
 

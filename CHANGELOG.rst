@@ -1,5 +1,9 @@
 Unreleased
 
+Release 1.3, 16th November 2024:
+
+* support save weight in alm
+
 Release 1.2, 15th November 2024:
 
 * NILC code refactor: Now calculates an ILC map at each NILC scale first, rather than computing beta and weights for all scales upfront. This release improves memory usage control.
