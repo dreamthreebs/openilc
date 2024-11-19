@@ -13,3 +13,11 @@ needlets internal combination for cmb data analysis
 ## FUTURE PLAN
 * use pytest
 * add other ILC
+
+## HIGH PERFORMANCE COMPUTATION
+SHT can be replace by other package or use healpy build from sources:
+* see https://github.com/healpy/healpy/blob/main/INSTALL.rst#generating-native-binaries first
+* download `cfitsio` version 4.5.0, then run ./configure --disable-curl;make;make install
+* download `healpix` version 3.8.3, configure with your `cfitsio` fitsio.h and cfitsio lib to build healpix cxx
+* add PKG_CONFIG_PATH for `cfitsio` and `healpix`
+* pip install --no-binary healpy healpy
