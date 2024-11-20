@@ -98,17 +98,17 @@ def check_res():
     plt.loglog(l*(l+1)*cl_fgres_map/(2*np.pi), label='foreground residual weight map')
 
     plt.xlabel('$\\ell$')
-    plt.ylabel('$D_\\ell [\mu K^2]$')
+    plt.ylabel('$D_\\ell [\\mu K^2]$')
 
     plt.legend()
     plt.show()
 
 def main():
-    gen_sim()
+    # gen_sim()
     test_nilc_w_alm()
-    get_fg_res_w_alm()
-    test_nilc_w_map()
-    get_fg_res_w_map()
-    check_res()
+    # get_fg_res_w_alm()
+    # test_nilc_w_map()
+    # get_fg_res_w_map()
+    # check_res()
 
 main()
