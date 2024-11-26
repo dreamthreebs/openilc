@@ -119,12 +119,13 @@ class NILC:
             beta[i] = hp.alm2map(beta_alm_ori, beta_nside)
 
         print(f'{beta.shape = }')
+        print(f'calculate beta for scale {j}...')
+
         return beta
 
-    def calc_w_for_scale(self, j):
+    def calc_w_for_scale(self, j, beta):
         oneVec = np.ones(self.nmaps)
         w_list = []
-        beta = self.calc_beta_for_scale(j)
 
         print(f"calc_weights at number:{j}")
         R_nside = self.needlet.at[j, 'nside']
@@ -174,7 +175,7 @@ class NILC:
             if self.weight_in_alm:
                 if self.weights_config is None:
                     print(f'calc weight...')
-                    ilc_w_alm = self.calc_w_for_scale(j)
+                    ilc_w_alm = self.calc_w_for_scale(j, beta)
                 else:
                     ilc_w_alm = weights[f'arr_{j}']
                 print(f'{ilc_w_alm.shape=}')
@@ -182,7 +183,7 @@ class NILC:
             else:
                 if self.weights_config is None:
                     print(f'calc weight...')
-                    ilc_w = self.calc_w_for_scale(j)
+                    ilc_w = self.calc_w_for_scale(j, beta)
                 else:
                     ilc_w = weights[f'arr_{j}']
 
