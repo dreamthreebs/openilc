@@ -7,6 +7,7 @@
 /**/nilc_weight
 /**/submit.sh
 /test_data
+/test_data_beam
 /test
 nilc_dev.py
 nilc_v0.py

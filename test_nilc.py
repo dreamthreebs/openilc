@@ -136,13 +136,13 @@ def check_res():
 
 def main():
 
-    gen_sim()
-    test_nilc_w_alm()
-    get_fg_res_w_alm()
-    get_n_res_w_alm()
-    test_nilc_w_map()
-    get_fg_res_w_map()
-    get_n_res_w_map()
+    # gen_sim()
+    # test_nilc_w_alm()
+    # get_fg_res_w_alm()
+    # get_n_res_w_alm()
+    # test_nilc_w_map()
+    # get_fg_res_w_map()
+    # get_n_res_w_map()
 
     check_res()
 

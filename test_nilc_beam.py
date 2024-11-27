@@ -67,9 +67,8 @@ def gen_sim():
         print(f"The index where the value is smaller than {bl_floor} is: {lmax_alm}")
 
         np.random.seed(seed=0)
-        cmb_with_beam = hp.synfast(cls=cl_cmb, nside=nside, fwhm=np.deg2rad(beam)/60)
+        cmb = hp.synfast(cls=cl_cmb, nside=nside, fwhm=np.deg2rad(beam)/60)
 
-        cmb = hp.alm2map(hp.almxfl(hp.map2alm(cmb_with_beam, lmax=lmax_alm), fl=1/bl), nside=nside)
         # cls_cmb = hp.anafast(cmb, lmax=lmax)
 
         # plt.loglog(l, l*(l+1)*cls_cmb/(2*np.pi), label=f'{beam=}')
@@ -80,62 +79,68 @@ def gen_sim():
         nstd = np.load(f'/afs/ihep.ac.cn/users/w/wangyiming25/work/dc2/psilc/FGSim/NSTDNORTH/{freq}.npy')[0]
         noise = nstd * np.random.normal(loc=0, scale=1, size=(npix,))
 
-        sim = cmb + fg + noise
+        sim_with_beam = cmb + fg + noise
+
+        sim = hp.alm2map(hp.almxfl(hp.map2alm(sim_with_beam, lmax=lmax_alm), fl=1/bl), nside=nside)
+        cmb = hp.alm2map(hp.almxfl(hp.map2alm(cmb, lmax=lmax_alm), fl=1/bl), nside=nside)
+        fg = hp.alm2map(hp.almxfl(hp.map2alm(fg, lmax=lmax_alm), fl=1/bl), nside=nside)
+        noise = hp.alm2map(hp.almxfl(hp.map2alm(noise, lmax=lmax_alm), fl=1/bl), nside=nside)
+
         sim_list.append(sim)
         cmb_list.append(cmb)
         fg_list.append(fg)
         noise_list.append(noise)
 
 
-    Path('./test_data').mkdir(exist_ok=True, parents=True)
-    np.save('./test_data/sim_cfn.npy', sim_list)
-    np.save('./test_data/sim_c.npy', cmb_list)
-    np.save('./test_data/sim_f.npy', fg_list)
-    np.save('./test_data/sim_n.npy', noise_list)
+    Path('./test_data_beam').mkdir(exist_ok=True, parents=True)
+    np.save('./test_data_beam/sim_cfn.npy', sim_list)
+    np.save('./test_data_beam/sim_c.npy', cmb_list)
+    np.save('./test_data_beam/sim_f.npy', fg_list)
+    np.save('./test_data_beam/sim_n.npy', noise_list)
 
 def test_nilc_w_alm():
     # do nilc and save the weights in alm
     time0 = time.time()
-    sim = np.load('./test_data/sim_cfn.npy')
-    obj_nilc = NILC(needlet_config='./needlets/beam_version.csv', weights_name='./nilc_weight/w_alm.npz', Sm_maps=sim, mask=None, lmax=lmax, nside=nside, n_iter=1)
+    sim = np.load('./test_data_beam/sim_cfn.npy')
+    obj_nilc = NILC(bandinfo='./bandinfo_beam.csv', needlet_config='./needlets/beam_version.csv', weights_name='./nilc_weight/w_alm.npz', Sm_maps=sim, mask=None, lmax=lmax, nside=nside, n_iter=1)
     clean_map = obj_nilc.run_nilc()
-    np.save('./test_data/cln_cmb_w_alm.npy', clean_map)
+    np.save('./test_data_beam/cln_cmb_w_alm.npy', clean_map)
     print(f'{time.time()-time0=}')
 
 def get_fg_res_w_alm():
     # this function tells you how to debias other component by using the weights in alm
-    fg = np.load('./test_data/sim_f.npy')
-    obj_nilc = NILC(needlet_config='./needlets/beam_version.csv', weights_config='./nilc_weight/w_alm.npz', Sm_maps=fg, mask=None, lmax=lmax, nside=nside, n_iter=1)
+    fg = np.load('./test_data_beam/sim_f.npy')
+    obj_nilc = NILC(bandinfo='./bandinfo_beam.csv', needlet_config='./needlets/beam_version.csv', weights_config='./nilc_weight/w_alm.npz', Sm_maps=fg, mask=None, lmax=lmax, nside=nside, n_iter=1)
     fg_res = obj_nilc.run_nilc()
-    np.save('./test_data/fg_res_w_alm.npy', fg_res)
+    np.save('./test_data_beam/fg_res_w_alm.npy', fg_res)
 
 def get_n_res_w_alm():
-    noise = np.load('./test_data/sim_n.npy')
-    obj_nilc = NILC(needlet_config='./needlets/beam_version.csv', weights_config='./nilc_weight/w_alm.npz', Sm_maps=noise, mask=None, lmax=lmax, nside=nside, n_iter=1)
+    noise = np.load('./test_data_beam/sim_n.npy')
+    obj_nilc = NILC(bandinfo='./bandinfo_beam.csv', needlet_config='./needlets/beam_version.csv', weights_config='./nilc_weight/w_alm.npz', Sm_maps=noise, mask=None, lmax=lmax, nside=nside, n_iter=1)
     fg_res = obj_nilc.run_nilc()
-    np.save('./test_data/n_res_w_alm.npy', fg_res)
+    np.save('./test_data_beam/n_res_w_alm.npy', fg_res)
 
 def test_nilc_w_map():
     # do nilc and save the weights in map
     time0 = time.time()
-    sim = np.load('./test_data/sim_cfn.npy')
-    obj_nilc = NILC(needlet_config='./needlets/beam_version.csv', weights_name='./nilc_weight/w_map.npz', Sm_maps=sim, mask=None, lmax=lmax, nside=nside, n_iter=1, weight_in_alm=False)
+    sim = np.load('./test_data_beam/sim_cfn.npy')
+    obj_nilc = NILC(bandinfo='./bandinfo_beam.csv', needlet_config='./needlets/beam_version.csv', weights_name='./nilc_weight/w_map.npz', Sm_maps=sim, mask=None, lmax=lmax, nside=nside, n_iter=1, weight_in_alm=False)
     clean_map = obj_nilc.run_nilc()
-    np.save('./test_data/cln_cmb_w_map.npy', clean_map)
+    np.save('./test_data_beam/cln_cmb_w_map.npy', clean_map)
     print(f'{time.time()-time0=}')
 
 def get_fg_res_w_map():
     # this function tells you how to debias other component by using the weights in map
-    fg = np.load('./test_data/sim_f.npy')
-    obj_nilc = NILC(needlet_config='./needlets/beam_version.csv', weights_config='./nilc_weight/w_map.npz', Sm_maps=fg, mask=None, lmax=lmax, nside=nside, n_iter=1, weight_in_alm=False)
+    fg = np.load('./test_data_beam/sim_f.npy')
+    obj_nilc = NILC(bandinfo='./bandinfo_beam.csv', needlet_config='./needlets/beam_version.csv', weights_config='./nilc_weight/w_map.npz', Sm_maps=fg, mask=None, lmax=lmax, nside=nside, n_iter=1, weight_in_alm=False)
     fg_res = obj_nilc.run_nilc()
-    np.save('./test_data/fg_res_w_map.npy', fg_res)
+    np.save('./test_data_beam/fg_res_w_map.npy', fg_res)
 
 def get_n_res_w_map():
-    noise = np.load('./test_data/sim_n.npy')
-    obj_nilc = NILC(needlet_config='./needlets/beam_version.csv', weights_config='./nilc_weight/w_map.npz', Sm_maps=noise, mask=None, lmax=lmax, nside=nside, n_iter=1, weight_in_alm=False)
+    noise = np.load('./test_data_beam/sim_n.npy')
+    obj_nilc = NILC(bandinfo='./bandinfo_beam.csv', needlet_config='./needlets/beam_version.csv', weights_config='./nilc_weight/w_map.npz', Sm_maps=noise, mask=None, lmax=lmax, nside=nside, n_iter=1, weight_in_alm=False)
     fg_res = obj_nilc.run_nilc()
-    np.save('./test_data/n_res_w_map.npy', fg_res)
+    np.save('./test_data_beam/n_res_w_map.npy', fg_res)
 
 
 
@@ -143,27 +148,27 @@ def check_res():
     # check result compared with input and the foreground residual
     l = np.arange(lmax+1)
 
-    cmb = np.load('./test_data/sim_c.npy')
+    cmb = np.load('./test_data_beam/sim_c.npy')
     cl_cmb = hp.anafast(cmb[6], lmax=lmax)
 
-    cln_cmb = np.load('./test_data/cln_cmb_w_alm.npy')
+    cln_cmb = np.load('./test_data_beam/cln_cmb_w_alm.npy')
     cl_cln = hp.anafast(cln_cmb, lmax=lmax)
 
-    fg_res = np.load('./test_data/fg_res_w_alm.npy')
+    fg_res = np.load('./test_data_beam/fg_res_w_alm.npy')
     cl_fgres = hp.anafast(fg_res, lmax=lmax)
 
-    n_res = np.load('./test_data/n_res_w_alm.npy')
+    n_res = np.load('./test_data_beam/n_res_w_alm.npy')
     cl_nres = hp.anafast(n_res, lmax=lmax)
 
-    cln_cmb_map = np.load('./test_data/cln_cmb_w_map.npy')
+    cln_cmb_map = np.load('./test_data_beam/cln_cmb_w_map.npy')
     cl_cln_map = hp.anafast(cln_cmb_map, lmax=lmax)
     hp.gnomview(cln_cmb_map, rot=[0,90,0], title='cln cmb map')
 
-    fg_res_map = np.load('./test_data/fg_res_w_map.npy')
+    fg_res_map = np.load('./test_data_beam/fg_res_w_map.npy')
     cl_fgres_map = hp.anafast(fg_res_map, lmax=lmax)
     hp.gnomview(fg_res_map, rot=[0,90,0], title='fg res map')
 
-    n_res_map = np.load('./test_data/n_res_w_map.npy')
+    n_res_map = np.load('./test_data_beam/n_res_w_map.npy')
     cl_nres_map = hp.anafast(n_res_map, lmax=lmax)
     hp.gnomview(n_res_map, rot=[0,90,0], title='noise res map')
     plt.show()
