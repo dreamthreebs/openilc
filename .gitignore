@@ -12,4 +12,5 @@ nilc_dev.py
 nilc_v0.py
 nilc_memory.py
 nilc_gpt.py
+test_nilc_dev.py
 

@@ -7,7 +7,7 @@ import gc
 from pathlib import Path
 
 class NILC:
-    def __init__(self, needlet_config='./needlets/default.csv', weights_name=None, weights_config=None, Sm_alms=None, Sm_maps=None, mask=None, lmax=1000, nside=1024, Rtol=1/1000, n_iter=3, weight_in_alm=True):
+    def __init__(self, bandinfo='./bandinfo.csv', needlet_config='./needlets/beam_version.csv', weights_name=None, weights_config=None, Sm_alms=None, Sm_maps=None, mask=None, lmax=1000, nside=1024, Rtol=1/1000, n_iter=3, weight_in_alm=True):
 
         """
         Needlets internal linear combination
@@ -16,6 +16,7 @@ class NILC:
 
         """
 
+        self.bandinfo = pd.read_csv(bandinfo)
         self.needlet = pd.read_csv(needlet_config) # load cosine needlets config
         self.n_needlet = len(self.needlet) # number of needlets bin
         self.weight_in_alm = weight_in_alm # save weight to alm or maps
@@ -110,29 +111,39 @@ class NILC:
         self.FWHM = FWHM
 
     def calc_beta_for_scale(self, j):
+        print(f'calculate beta for scale {j}...')
         hl = self.hl[j]
         beta_nside = self.needlet.at[j, 'nside']
+        beta_lmax = self.needlet.at[j, 'lmax']
         beta_npix = hp.nside2npix(beta_nside)
-        beta = np.zeros((self.nmaps, beta_npix))
-        for i in range(self.nmaps):
-            beta_alm_ori = hp.almxfl(self.alms[i], self.hl[j])
+
+        idx_to_remove = self.bandinfo[self.bandinfo['lmax_alm'] < beta_lmax].index
+        alms = np.delete(self.alms, idx_to_remove, axis=0)
+        nmaps = np.size(alms, axis=0)
+        print(f'{idx_to_remove=}, {alms.shape=}, {nmaps=}')
+
+        beta = np.zeros((nmaps, beta_npix))
+
+        for i in range(nmaps):
+            beta_alm_ori = hp.almxfl(alms[i], self.hl[j])
             beta[i] = hp.alm2map(beta_alm_ori, beta_nside)
 
         print(f'{beta.shape = }')
-        print(f'calculate beta for scale {j}...')
 
         return beta
 
     def calc_w_for_scale(self, j, beta):
-        oneVec = np.ones(self.nmaps)
         w_list = []
-
         print(f"calc_weights at number:{j}")
+
+        nmaps = np.size(beta, axis=0)
+        oneVec = np.ones(nmaps)
+
         R_nside = self.needlet.at[j, 'nside']
         R_lmax = self.needlet.at[j, 'lmax']
-        R = np.zeros((hp.nside2npix(R_nside), self.nmaps, self.nmaps))
-        for c1 in range(self.nmaps):
-            for c2 in range(c1,self.nmaps):
+        R = np.zeros((hp.nside2npix(R_nside), nmaps, nmaps))
+        for c1 in range(nmaps):
+            for c2 in range(c1,nmaps):
                 prodMap = beta[c1] * beta[c2]
                 # hp.mollview(prodMap, norm='hist', title = f"{j = }, {c1 = }, {c2 = }")
                 # plt.show()
@@ -151,7 +162,7 @@ class NILC:
         invR = np.linalg.inv(R)
         if self.weight_in_alm:
             w_map = (invR@oneVec).T/(oneVec@invR@oneVec + 1e-15)
-            w = np.asarray([hp.map2alm(w_map[i], lmax=R_lmax) for i in range(self.nmaps)])
+            w = np.asarray([hp.map2alm(w_map[i], lmax=R_lmax) for i in range(nmaps)])
         else:
             w = (invR@oneVec).T/(oneVec@invR@oneVec + 1e-15)
         return w
@@ -179,7 +190,8 @@ class NILC:
                 else:
                     ilc_w_alm = weights[f'arr_{j}']
                 print(f'{ilc_w_alm.shape=}')
-                ilc_w = np.asarray([hp.alm2map(ilc_w_alm[i], nside=R_nside) for i in range(self.nmaps)])
+                nmaps = np.size(beta, axis=0)
+                ilc_w = np.asarray([hp.alm2map(ilc_w_alm[i], nside=R_nside) for i in range(nmaps)])
             else:
                 if self.weights_config is None:
                     print(f'calc weight...')
