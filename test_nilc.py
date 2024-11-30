@@ -17,8 +17,10 @@ def gen_sim():
     sim_list = []
     fg_list = []
     n_list = []
-    df = pd.read_csv('/afs/ihep.ac.cn/users/w/wangyiming25/work/dc2/psilc/FGSim/FreqBand')
-    cl_cmb = np.load('/afs/ihep.ac.cn/users/w/wangyiming25/work/dc2/psilc/src/cmbsim/cmbdata/cmbcl_8k.npy').T[0]
+    # df = pd.read_csv('/afs/ihep.ac.cn/users/w/wangyiming25/work/dc2/psilc/FGSim/FreqBand5') # for ali users
+    # cl_cmb = np.load('/afs/ihep.ac.cn/users/w/wangyiming25/work/dc2/psilc/src/cmbsim/cmbdata/cmbcl_8k.npy').T[0] # for ali users
+    df = pd.read_csv('./data/FreqBand5')
+    cl_cmb = np.load('./data/cmb/cmbcl_8k.npy').T[0]
     print(f'{cl_cmb.shape=}')
 
     np.random.seed(seed=0)
@@ -29,9 +31,11 @@ def gen_sim():
         beam = df.at[freq_idx, 'beam']
         print(f'{freq=}, {beam=}')
 
-        fg = np.load(f'/afs/ihep.ac.cn/users/w/wangyiming25/work/dc2/psilc/FGSim/FG/{freq}.npy')[0]
-        nstd = np.load(f'/afs/ihep.ac.cn/users/w/wangyiming25/work/dc2/psilc/FGSim/NSTDNORTH/{freq}.npy')[0]
-        noise = 100 * nstd * np.random.normal(loc=0, scale=1, size=(npix,))
+        # fg = np.load(f'/afs/ihep.ac.cn/users/w/wangyiming25/work/dc2/psilc/FGSim/FG5/{freq}.npy')[0] # for ali users
+        # nstd = np.load(f'/afs/ihep.ac.cn/users/w/wangyiming25/work/dc2/psilc/FGSim/NSTDNORTH5/{freq}.npy')[0] # for ali users
+        fg = np.load(f'./data/fg/{freq}.npy')
+        nstd = df.at[freq_idx, 'nstd']
+        noise = nstd * np.random.normal(loc=0, scale=1, size=(npix,))
 
         sim = cmb + fg + noise
         sim_list.append(sim)
@@ -136,13 +140,13 @@ def check_res():
 
 def main():
 
-    # gen_sim()
-    # test_nilc_w_alm()
-    # get_fg_res_w_alm()
-    # get_n_res_w_alm()
-    # test_nilc_w_map()
-    # get_fg_res_w_map()
-    # get_n_res_w_map()
+    gen_sim()
+    test_nilc_w_alm()
+    get_fg_res_w_alm()
+    get_n_res_w_alm()
+    test_nilc_w_map()
+    get_fg_res_w_map()
+    get_n_res_w_map()
 
     check_res()
 

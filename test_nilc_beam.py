@@ -50,8 +50,10 @@ def gen_sim():
     cmb_list = []
     fg_list = []
     noise_list = []
-    df = pd.read_csv('/afs/ihep.ac.cn/users/w/wangyiming25/work/dc2/psilc/FGSim/FreqBand')
-    cl_cmb = np.load('/afs/ihep.ac.cn/users/w/wangyiming25/work/dc2/psilc/src/cmbsim/cmbdata/cmbcl_8k.npy').T[0]
+    # df = pd.read_csv('/afs/ihep.ac.cn/users/w/wangyiming25/work/dc2/psilc/FGSim/FreqBand5') # for ali users
+    # cl_cmb = np.load('/afs/ihep.ac.cn/users/w/wangyiming25/work/dc2/psilc/src/cmbsim/cmbdata/cmbcl_8k.npy').T[0] # for ali users
+    df = pd.read_csv('./data/FreqBand5')
+    cl_cmb = np.load('./data/cmb/cmbcl_8k.npy').T[0]
     print(f'{cl_cmb.shape=}')
 
     l = np.arange(lmax+1)
@@ -75,8 +77,10 @@ def gen_sim():
         # plt.legend()
         # plt.show()
 
-        fg = np.load(f'/afs/ihep.ac.cn/users/w/wangyiming25/work/dc2/psilc/FGSim/FG/{freq}.npy')[0]
-        nstd = np.load(f'/afs/ihep.ac.cn/users/w/wangyiming25/work/dc2/psilc/FGSim/NSTDNORTH/{freq}.npy')[0]
+        # fg = np.load(f'/afs/ihep.ac.cn/users/w/wangyiming25/work/dc2/psilc/FGSim/FG5/{freq}.npy')[0] # for ali users
+        # nstd = np.load(f'/afs/ihep.ac.cn/users/w/wangyiming25/work/dc2/psilc/FGSim/NSTDNORTH5/{freq}.npy')[0] # for ali users
+        fg = np.load(f'./data/fg/{freq}.npy')
+        nstd = df.at[freq_idx, 'nstd']
         noise = nstd * np.random.normal(loc=0, scale=1, size=(npix,))
 
         sim_with_beam = cmb + fg + noise
@@ -149,7 +153,7 @@ def check_res():
     l = np.arange(lmax+1)
 
     cmb = np.load('./test_data_beam/sim_c.npy')
-    cl_cmb = hp.anafast(cmb[6], lmax=lmax)
+    cl_cmb = hp.anafast(cmb[4], lmax=lmax)
 
     cln_cmb = np.load('./test_data_beam/cln_cmb_w_alm.npy')
     cl_cln = hp.anafast(cln_cmb, lmax=lmax)
@@ -190,13 +194,13 @@ def check_res():
 
 def main():
 
-    # gen_sim()
-    # test_nilc_w_alm()
-    # get_fg_res_w_alm()
-    # get_n_res_w_alm()
-    # test_nilc_w_map()
-    # get_fg_res_w_map()
-    # get_n_res_w_map()
+    gen_sim()
+    test_nilc_w_alm()
+    get_fg_res_w_alm()
+    get_n_res_w_alm()
+    test_nilc_w_map()
+    get_fg_res_w_map()
+    get_n_res_w_map()
 
     check_res()
 
