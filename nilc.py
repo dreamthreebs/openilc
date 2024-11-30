@@ -16,7 +16,7 @@ class NILC:
 
         """
 
-        self.bandinfo = pd.read_csv(bandinfo)
+        self.bandinfo = pd.read_csv(bandinfo) # load band info
         self.needlet = pd.read_csv(needlet_config) # load cosine needlets config
         self.n_needlet = len(self.needlet) # number of needlets bin
         self.weight_in_alm = weight_in_alm # save weight to alm or maps
