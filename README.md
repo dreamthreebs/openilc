@@ -28,10 +28,7 @@ This repository provides tools for performing Needlets Internal Linear Combinati
   - Experimental configuration file for cases considering beam corrections.  
   - **Important Rules**:  
     - Set `lmax_alm` carefully to avoid numerical errors at large `ell` values (e.g., for `beam=60`, `lmax_alm ~ 500`).  
-    - Ensure that your smoothed map is **band-limited**:  
-      - Use `hp.map2alm` with `lmax_alm`, then smooth with `hp.almxfl`, and finally convert back with `alm2map`.  
-      - Alternatively, use an `alm` padded with zeros.
-    - We recommand to use the same band-limited lmax and `lmax_alm`
+    - Ensure to use the bigger band-limited lmax (when you do deconvolve and convolve your map) than `lmax_alm`
 
 #### **3. Tutorials**
 - **`test_nilc.py`**:  

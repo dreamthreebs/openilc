@@ -55,7 +55,11 @@ class NILC:
 
             Sm_alms_list = []
             for i in range(self.nmaps):
-                Sm_alm = hp.map2alm(self.maps[i], lmax=lmax, iter=self.n_iter)
+                lmax_alm = self.bandinfo.at[i, 'lmax_alm']
+                if lmax_alm >= (3 * self.nside - 1):
+                    lmax_alm = 3 * self.nside - 1
+                Sm_alm = hp.map2alm(self.maps[i], lmax=lmax_alm, iter=self.n_iter)
+                Sm_alm = hp.resize_alm(alm=Sm_alm, lmax=lmax_alm, mmax=lmax_alm, lmax_out=lmax, mmax_out=lmax)
                 Sm_alms_list.append(Sm_alm)
             self.alms = np.asarray(Sm_alms_list)
 
