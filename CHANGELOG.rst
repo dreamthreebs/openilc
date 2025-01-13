@@ -1,11 +1,14 @@
 Unreleased
 
+Release 1.5, 13th January 2025:
+
+* now your input map could not be the same as `lmax_alm` in `bandinfo.csv`
+
 Release 1.4, 27th November 2024:
 
 * remove redundant code when calculating beta
 * added `bandinfo.csv` and `bandinfo` parameter in `nilc.py`. Now NILC calculate to your largest lmax of your bands, not the lowest (lmax represent where numerical error occur)
 * add test for situation with beam
-
 
 Release 1.3, 16th November 2024:
 
