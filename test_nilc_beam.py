@@ -194,7 +194,7 @@ def check_res():
 
 def main():
 
-    gen_sim()
+    # gen_sim()
     test_nilc_w_alm()
     get_fg_res_w_alm()
     get_n_res_w_alm()
