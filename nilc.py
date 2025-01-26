@@ -12,31 +12,54 @@ class NILC:
         """
         Needlets internal linear combination
 
-        input Sm_maps should be dimention: (n_freq, n_pixel) or Sm_alms with dimention:(n_freq, n_alm)
-
+        Parameters:
+            bandinfo: str
+            Path to the bands information, including frequency, beam, lmax_alm (the lmax when map2alm)
+            needlet_config: str
+            Path to needlets configuration, including lmin, lpeak and lmax of each needlets scale
+            weights_name: str
+            Path where to save the weights at each needlets scale, if weight_in_alm is True, save weights in alm, else save in maps
+            weights_config: str
+            Path where to load the weights at each needlets scale, if weight_in_alm is True, load weights in alm, else load in maps
+            Sm_alms: np.ndarray
+            Input smoothed alms, all your maps should be in the same resolution to satisfy the ILC condition. The shape of this parameter should be (n_freq, n_alm)
+            Sm_maps: np.ndarray
+            Input smoothed maps, all your maps should be in the same resolution to satisfy the ILC condition. The shape of this parameter should be (n_freq, n_pixel)
+            mask: np.ndarray
+            Input mask, shape should be (n_pixel,)
+            lmax: int
+            Maximum ell, should be the same in the latest lmax in needlet_config
+            nside: int
+            The nside of output
+            Rtol: float
+            Theoretical percentage of ilc bias (will change your degree of freedom when calc R covariance matrix)
+            n_iter: int
+            Iteration number when calculating alm
+            weight_in_alm: bool
+            Whether to save weight in alm
         """
 
         self.bandinfo = pd.read_csv(bandinfo) # load band info
         self.needlet = pd.read_csv(needlet_config) # load cosine needlets config
         self.n_needlet = len(self.needlet) # number of needlets bin
-        self.weight_in_alm = weight_in_alm # save weight to alm or maps
+        self.weight_in_alm = weight_in_alm
 
         if weights_name is not None:
             if Path(weights_name).suffix != '.npz':
                 raise ValueError('the weights should be saved as .npz file')
-            self.weights_name = Path(weights_name) # where to save your weights
+            self.weights_name = Path(weights_name)
             self.weights_name.parent.mkdir(parents=True, exist_ok=True) # you don't need to make a new dir for weights
         else:
             self.weights_name = weights_name
 
         if weights_config is not None:
-            self.weights_config = Path(weights_config) # where to find your weights
+            self.weights_config = Path(weights_config)
         else:
             self.weights_config = weights_config
 
-        self.Rtol = Rtol # theoretical percentage of ilc bias (will change your degree of freedom when calc R covariance matrix)
-        self.lmax = lmax # maximum lmax when calculating alm, should be set as the same as needlets last bin's lmax
-        self.n_iter = n_iter # iteration number when calculating alm
+        self.Rtol = Rtol
+        self.lmax = lmax
+        self.n_iter = n_iter
 
         if (weights_config is not None) and (weights_name is not None):
             raise ValueError('weights should not be given and calculated at the same time!')
@@ -77,6 +100,7 @@ class NILC:
         print(f'{Rtol=}, {lmax=}, nside={self.nside}')
 
     def calc_hl(self):
+        # generate cosine filter in alm at each needlets scale
         hl = np.zeros((self.n_needlet, self.lmax+1))
         l_range = np.arange(self.lmax+1)
         for j in range(self.n_needlet):
@@ -94,6 +118,7 @@ class NILC:
         self.hl = hl
 
     def calc_FWHM(self):
+        # get gaussian smoothing sigma from Rtol
         Neff = (self.nmaps - 1) / self.Rtol
         FWHM = np.zeros(self.n_needlet)
         for j in range(self.n_needlet):
