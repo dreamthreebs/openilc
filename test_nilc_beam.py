@@ -12,40 +12,8 @@ nside = 512
 npix = hp.nside2npix(nside)
 lmax = 1000
 
-def expand_alm_with_hp(alm, lmax_current, lmax_target):
-    """
-    Expands a healpy alm array from lmax_current to lmax_target by padding with zeros.
-
-    Args:
-    alm (ndarray): Input alm array with current lmax.
-    lmax_current (int): The current lmax of the alm array.
-    lmax_target (int): The target lmax to expand to.
-
-    Returns:
-    ndarray: The expanded alm array with lmax_target.
-    """
-    # Ensure the target lmax is not smaller than the current lmax
-    if lmax_target <= lmax_current:
-        return alm
-    else:
-        # Compute the total number of alm for the target lmax
-        alm_target_size = hp.Alm.getsize(lmax_target)
-
-        # Initialize the expanded alm array with zeros
-        alm_expanded = np.zeros(alm_target_size, dtype=alm.dtype)
-
-        # Fill the expanded array with existing alm values
-
-        for l in range(lmax_current + 1):
-            for m in range(l + 1): # m ranges from 0 to l
-                idx_current = hp.Alm.getidx(lmax_current, l, m)
-                idx_target = hp.Alm.getidx(lmax_target, l, m)
-                alm_expanded[idx_target] = alm[idx_current]
-                # print(f'{l=}, {m=}, {idx_current=}, {idx_target=}')
-        return alm_expanded
-
 def gen_sim():
-    # generate cmb + foreground simulation, cmb is T mode and no beam on different frequency
+    # generate cmb + foreground + noise simulation, cmb is T mode and no beam on different frequency
     sim_list = []
     cmb_list = []
     fg_list = []
@@ -119,6 +87,7 @@ def get_fg_res_w_alm():
     np.save('./test_data_beam/fg_res_w_alm.npy', fg_res)
 
 def get_n_res_w_alm():
+    # calc noise bias term
     noise = np.load('./test_data_beam/sim_n.npy')
     obj_nilc = NILC(bandinfo='./bandinfo_beam.csv', needlet_config='./needlets/beam_version.csv', weights_config='./nilc_weight/w_alm.npz', Sm_maps=noise, mask=None, lmax=lmax, nside=nside, n_iter=1)
     fg_res = obj_nilc.run_nilc()
@@ -141,6 +110,7 @@ def get_fg_res_w_map():
     np.save('./test_data_beam/fg_res_w_map.npy', fg_res)
 
 def get_n_res_w_map():
+    # noise bias term
     noise = np.load('./test_data_beam/sim_n.npy')
     obj_nilc = NILC(bandinfo='./bandinfo_beam.csv', needlet_config='./needlets/beam_version.csv', weights_config='./nilc_weight/w_map.npz', Sm_maps=noise, mask=None, lmax=lmax, nside=nside, n_iter=1, weight_in_alm=False)
     fg_res = obj_nilc.run_nilc()
@@ -149,7 +119,9 @@ def get_n_res_w_map():
 
 
 def check_res():
-    # check result compared with input and the foreground residual
+    # check result compared with input and the foreground residual and noise bias
+    # save weights in alm or map should not affect the final results so there lines in plots are overlapped
+
     l = np.arange(lmax+1)
 
     cmb = np.load('./test_data_beam/sim_c.npy')
@@ -194,7 +166,8 @@ def check_res():
 
 def main():
 
-    # gen_sim()
+    gen_sim()
+
     test_nilc_w_alm()
     get_fg_res_w_alm()
     get_n_res_w_alm()

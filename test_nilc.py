@@ -13,7 +13,7 @@ npix = hp.nside2npix(nside)
 lmax = 500
 
 def gen_sim():
-    # generate cmb + foreground simulation, cmb is T mode and no beam on different frequency
+    # generate cmb + foreground + noise simulation, cmb is T mode and no beam on different frequency
     sim_list = []
     fg_list = []
     n_list = []
@@ -65,6 +65,7 @@ def get_fg_res_w_alm():
     np.save('./test_data/fg_res_w_alm.npy', fg_res)
 
 def get_n_res_w_alm():
+    # calc noise bias
     noise = np.load('./test_data/sim_n.npy')
     obj_nilc = NILC(needlet_config='./needlets/default.csv', weights_config='./nilc_weight/w_alm.npz', Sm_maps=noise, mask=None, lmax=lmax, nside=nside, n_iter=1)
     fg_res = obj_nilc.run_nilc()
@@ -87,6 +88,7 @@ def get_fg_res_w_map():
     np.save('./test_data/fg_res_w_map.npy', fg_res)
 
 def get_n_res_w_map():
+    # calc noise bias
     noise = np.load('./test_data/sim_n.npy')
     obj_nilc = NILC(needlet_config='./needlets/default.csv', weights_config='./nilc_weight/w_map.npz', Sm_maps=noise, mask=None, lmax=lmax, nside=nside, n_iter=1, weight_in_alm=False)
     fg_res = obj_nilc.run_nilc()
@@ -95,7 +97,9 @@ def get_n_res_w_map():
 
 
 def check_res():
-    # check result compared with input and the foreground residual
+    # check result compared with input and the foreground residual and noise bias
+    # save weights in alm or map should not affect the final results so there lines in plots are overlapped
+
     l = np.arange(lmax+1)
 
     cmb = np.load('./test_data/sim_c.npy')
@@ -131,6 +135,7 @@ def check_res():
     plt.loglog(l*(l+1)*cl_cln_map/(2*np.pi), label='after nilc map weight map')
     plt.loglog(l*(l+1)*cl_fgres_map/(2*np.pi), label='foreground residual weight map')
     plt.loglog(l*(l+1)*cl_nres_map/(2*np.pi), label='noise residual weight map')
+    plt.loglog(l*(l+1)*(cl_nres_map-cl_nres_map)/(2*np.pi), label='debiased weight map')
 
     plt.xlabel('$\\ell$')
     plt.ylabel('$D_\\ell [\\mu K^2]$')
@@ -141,6 +146,7 @@ def check_res():
 def main():
 
     gen_sim()
+
     test_nilc_w_alm()
     get_fg_res_w_alm()
     get_n_res_w_alm()
