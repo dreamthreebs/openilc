@@ -6,7 +6,11 @@ import time
 
 from pathlib import Path
 from nilc import NILC
-# from memory_profiler import profile
+
+# ==== NEW: PySM imports ====
+import pysm3
+import pysm3.units as u
+# ===========================
 
 nside = 512
 npix = hp.nside2npix(nside)
@@ -15,40 +19,59 @@ R_tol = 1 / 100
 
 
 def gen_sim():
-    # generate cmb + foreground + noise simulation, cmb is T mode and no beam on different frequency
+    """
+    generate cmb + foreground(d0+s0) + noise simulations
+
+    - CMB: scalar T field from input Cl, no beam
+    - FG: PySM3 Sky with dust d0 + synchrotron s0, unit uK_CMB, no beam
+    - Noise: Gaussian pixel noise with nstd from FreqBand5
+    """
     sim_list = []
     fg_list = []
     n_list = []
-    # df = pd.read_csv('/afs/ihep.ac.cn/users/w/wangyiming25/work/dc2/psilc/FGSim/FreqBand5') # for ali users
-    # cl_cmb = np.load('/afs/ihep.ac.cn/users/w/wangyiming25/work/dc2/psilc/src/cmbsim/cmbdata/cmbcl_8k.npy').T[0] # for ali users
+
     df = pd.read_csv("./data/FreqBand5")
     cl_cmb = np.load("./data/cmb/cmbcl_8k.npy").T[0]
     print(f"{cl_cmb.shape=}")
 
+    # --- CMB simulation (T only) ---
     np.random.seed(seed=0)
     cmb = hp.synfast(cls=cl_cmb, nside=nside)
 
+    # --- NEW: build PySM sky with d0+s0 ---
+    # Output unit chosen to match CMB map units (uK_CMB)
+    sky = pysm3.Sky(
+        nside=nside,
+        preset_strings=["d1", "s1"],
+        output_unit="uK_CMB",
+    )
+
     for freq_idx in range(len(df)):
-        freq = df.at[freq_idx, "freq"]
+        freq = df.at[freq_idx, "freq"]  # in GHz
         beam = df.at[freq_idx, "beam"]
         print(f"{freq=}, {beam=}")
 
-        # fg = np.load(f'/afs/ihep.ac.cn/users/w/wangyiming25/work/dc2/psilc/FGSim/FG5/{freq}.npy')[0] # for ali users
-        # nstd = np.load(f'/afs/ihep.ac.cn/users/w/wangyiming25/work/dc2/psilc/FGSim/NSTDNORTH5/{freq}.npy')[0] # for ali users
-        fg = np.load(f"./data/fg/{freq}.npy")
+        # --- NEW: foreground from PySM d0+s0 at this frequency ---
+        # sky.get_emission returns (I,Q,U) in uK_CMB as an astropy Quantity
+        fg_maps = sky.get_emission(freq * u.GHz)  # shape (3, npix)
+        fg = fg_maps[0].value  # use I only, drop units
+
+        # --- Noise map ---
         nstd = df.at[freq_idx, "nstd"]
         noise = nstd * np.random.normal(loc=0, scale=1, size=(npix,))
 
+        # Combined channel map
         sim = cmb + fg + noise
+
         sim_list.append(sim)
         fg_list.append(fg)
         n_list.append(noise)
 
     Path("./test_data").mkdir(exist_ok=True, parents=True)
-    np.save("./test_data/sim_cfn.npy", sim_list)
+    np.save("./test_data/sim_cfn.npy", np.array(sim_list))
     np.save("./test_data/sim_c.npy", cmb)
-    np.save("./test_data/sim_f.npy", fg_list)
-    np.save("./test_data/sim_n.npy", n_list)
+    np.save("./test_data/sim_f.npy", np.array(fg_list))
+    np.save("./test_data/sim_n.npy", np.array(n_list))
 
 
 def test_nilc_w_alm():
@@ -175,7 +198,6 @@ def get_cmb_res_w_map():
 
 def check_res():
     # check result compared with input and the foreground residual and noise bias
-    # save weights in alm or map should not affect the final results so there lines in plots are overlapped
 
     l = np.arange(lmax + 1)
 
@@ -238,7 +260,6 @@ def main():
     test_nilc_w_alm()
     get_fg_res_w_alm()
     get_n_res_w_alm()
-
     test_nilc_w_map()
     get_fg_res_w_map()
     get_n_res_w_map()
@@ -246,4 +267,5 @@ def main():
     check_res()
 
 
-main()
+if __name__ == "__main__":
+    main()
