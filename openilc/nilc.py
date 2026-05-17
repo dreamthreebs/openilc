@@ -5,9 +5,10 @@ import gc
 
 from pathlib import Path
 from .configs import load_csv_table, load_table
+from .sht import get_sht_backend
 
 class NILC:
-    def __init__(self, bandinfo, needlet_config, weights_name=None, weights_config=None, Sm_alms=None, Sm_maps=None, mask=None, lmax=1000, nside=1024, Rtol=1/1000, n_iter=3, weight_in_alm=True):
+    def __init__(self, bandinfo, needlet_config, weights_name=None, weights_config=None, Sm_alms=None, Sm_maps=None, mask=None, lmax=1000, nside=1024, Rtol=1/1000, n_iter=3, weight_in_alm=True, sht_backend="healpy", sht_nthreads=None):
 
         """
         Needlets internal linear combination
@@ -37,12 +38,19 @@ class NILC:
             Iteration number when calculating alm
             weight_in_alm: bool
             Whether to save weight in alm
+            sht_backend: str
+            Spherical harmonic backend: "healpy", "ducc0", or "ducc0_pseudo"
+            sht_nthreads: int
+            Number of threads for the SHT backend. For ducc0, None maps to 0,
+            which lets ducc0 use all available hardware threads.
         """
 
         self.bandinfo = load_table(bandinfo) # load band info
         self.needlet = load_table(needlet_config) # load cosine needlets config
         self.n_needlet = len(self.needlet) # number of needlets bin
         self.weight_in_alm = weight_in_alm
+        self.sht_backend = sht_backend
+        self.sht = get_sht_backend(sht_backend, nthreads=sht_nthreads)
 
         if weights_name is not None:
             if Path(weights_name).suffix != '.npz':
@@ -60,6 +68,9 @@ class NILC:
         self.Rtol = Rtol
         self.lmax = lmax
         self.n_iter = n_iter
+
+        if sht_backend == "ducc0" and n_iter not in (0, None):
+            raise ValueError("ducc0 backend requires n_iter=0 or n_iter=None")
 
         if (weights_config is not None) and (weights_name is not None):
             raise ValueError('weights should not be given and calculated at the same time!')
@@ -80,9 +91,9 @@ class NILC:
             for i in range(self.nmaps):
                 lmax_alm = self.bandinfo.at[i, 'lmax_alm']
                 if lmax_alm >= lmax:
-                    Sm_alm = hp.map2alm(self.maps[i], lmax=lmax, iter=self.n_iter)
+                    Sm_alm = self.sht.map2alm(self.maps[i], lmax=lmax, n_iter=self.n_iter)
                 else:
-                    Sm_alm = hp.map2alm(self.maps[i], lmax=lmax_alm, iter=self.n_iter)
+                    Sm_alm = self.sht.map2alm(self.maps[i], lmax=lmax_alm, n_iter=self.n_iter)
                     Sm_alm = hp.resize_alm(alm=Sm_alm, lmax=lmax_alm, mmax=lmax_alm, lmax_out=lmax, mmax_out=lmax)
                 Sm_alms_list.append(Sm_alm)
             self.alms = np.asarray(Sm_alms_list)
@@ -97,7 +108,7 @@ class NILC:
             self.nside = nside
 
         print(f'{weights_config=}, {weights_name=}, {needlet_config=}')
-        print(f'{Rtol=}, {lmax=}, nside={self.nside}')
+        print(f'{Rtol=}, {lmax=}, nside={self.nside}, sht_backend={self.sht_backend}')
 
     @classmethod
     def from_csv(cls, bands, needlets, **kwargs):
@@ -166,7 +177,7 @@ class NILC:
 
         for i in range(nmaps):
             beta_alm_ori = hp.almxfl(alms[i], self.hl[j])
-            beta[i] = hp.alm2map(beta_alm_ori, beta_nside)
+            beta[i] = self.sht.alm2map(beta_alm_ori, beta_nside)
 
         print(f'{beta.shape = }')
 
@@ -202,7 +213,7 @@ class NILC:
         invR = np.linalg.inv(R)
         if self.weight_in_alm:
             w_map = (invR@oneVec).T/(oneVec@invR@oneVec + 1e-15)
-            w = np.asarray([hp.map2alm(w_map[i], lmax=R_lmax) for i in range(nmaps)])
+            w = np.asarray([self.sht.map2alm(w_map[i], lmax=R_lmax, n_iter=None) for i in range(nmaps)])
         else:
             w = (invR@oneVec).T/(oneVec@invR@oneVec + 1e-15)
         return w
@@ -231,7 +242,7 @@ class NILC:
                     ilc_w_alm = weights[f'arr_{j}']
                 print(f'{ilc_w_alm.shape=}')
                 nmaps = np.size(beta, axis=0)
-                ilc_w = np.asarray([hp.alm2map(ilc_w_alm[i], nside=R_nside) for i in range(nmaps)])
+                ilc_w = np.asarray([self.sht.alm2map(ilc_w_alm[i], nside=R_nside) for i in range(nmaps)])
             else:
                 if self.weights_config is None:
                     print(f'calc weight...')
@@ -243,11 +254,11 @@ class NILC:
 
             res  = np.sum(beta * ilc_w, axis=0)
             print(f'calc ilc beta...')
-            res_alm = hp.map2alm(res, iter=self.n_iter)
+            res_alm = self.sht.map2alm(res, n_iter=self.n_iter)
             print(f'{res_alm.shape = }')
             res_alm = hp.almxfl(res_alm, self.hl[j])
             print(f'after resxflalm shape = {res_alm.shape}')
-            ilced_Map = hp.alm2map(res_alm, self.nside)
+            ilced_Map = self.sht.alm2map(res_alm, self.nside)
             resMap = resMap + ilced_Map
 
             if self.weights_config is None:

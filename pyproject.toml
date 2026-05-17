@@ -21,6 +21,7 @@ dependencies = [
 [project.optional-dependencies]
 tutorial = [
   "camb",
+  "ducc0",
   "pysm3",
 ]
 

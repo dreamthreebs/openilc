@@ -58,6 +58,50 @@ nilc = NILC.from_csv(
 )
 ```
 
+The spherical harmonic transform backend is configurable. The default is
+`healpy`. If `ducc0` is installed, use it with non-iterative transforms:
+
+```python
+nilc = NILC.from_csv(
+    "configs/bands.csv",
+    "configs/needlets_default.csv",
+    Sm_maps=maps,
+    lmax=500,
+    n_iter=0,
+    sht_backend="ducc0",
+    sht_nthreads=0,
+)
+```
+
+Backend meanings:
+
+| `sht_backend` | `map2alm` behavior | `n_iter` meaning | Recommended use |
+| --- | --- | --- | --- |
+| `"healpy"` | `healpy.map2alm` | passed to `healpy.map2alm(iter=...)` | default, conservative choice |
+| `"ducc0"` | `ducc0.sht.adjoint_synthesis`, scaled by pixel area | must be `0` or `None` | fast non-iterative comparison with healpy `iter=0` |
+| `"ducc0_pseudo"` | `ducc0.sht.pseudo_analysis` | passed to `pseudo_analysis(maxiter=...)` | experimental iterative ducc0 analysis |
+
+`sht_nthreads=0` asks ducc0 to use all available hardware threads.
+
+For ducc0's iterative pseudo-analysis path, use:
+
+```python
+nilc = NILC.from_csv(
+    "configs/bands.csv",
+    "configs/needlets_default.csv",
+    Sm_maps=maps,
+    lmax=500,
+    n_iter=3,
+    sht_backend="ducc0_pseudo",
+    sht_nthreads=0,
+)
+```
+
+Here `n_iter` is passed to `ducc0.sht.pseudo_analysis(maxiter=...)`. This is not
+a bit-for-bit alias for `healpy.map2alm(iter=...)`; it is a different iterative
+solver. Compare maps and spectra for your science case before switching
+defaults.
+
 ## Configuration
 
 Configuration is intentionally outside the Python package. CSV is the
@@ -123,6 +167,7 @@ The tutorial scripts are examples, not pytest tests:
 
 - `tutorials/tutorial_nilc.py`: basic NILC example using the default CSV configs.
 - `tutorials/tutorial_nilc_beam.py`: beam-aware NILC example using the beam CSV configs.
+- `tutorials/tutorial_sht_backend.py`: compare `healpy`, `ducc0`, and `ducc0_pseudo` SHT backends.
 - `tutorials/tutorial_ilc_bias.py`: ILC bias tutorial.
 - `tutorials/tutorial_cpr_ilc.py`: CPR/HILC experiments.
 
@@ -132,10 +177,11 @@ Typical workflow:
 cd tutorials
 python tutorial_nilc.py
 python tutorial_nilc_beam.py
+python tutorial_sht_backend.py --nsides 128 256 512 --nthreads 0 --pseudo-iter 3
 ```
 
 These scripts write generated arrays into ignored local directories such as
-`test_data/`, `test_data_beam/`, and `nilc_weight/`.
+`test_data/`, `test_data_beam/`, `nilc_weight/`, and `tutorial_outputs/`.
 
 ## Tests
 
@@ -163,6 +209,10 @@ from openilc import NILC, HILC
 
 ## High Performance Computing
 
-Spherical harmonic transforms can be accelerated by building `healpy` from
-optimized native libraries. See the healpy installation notes, then install
-`cfitsio`, `healpix`, and rebuild `healpy` from source if needed.
+For spherical harmonic transforms, the default backend is `healpy`. You can also
+install the optional tutorial dependencies and select `sht_backend="ducc0"` or
+`sht_backend="ducc0_pseudo"` for the NILC transforms. The first is the fast
+adjoint path and should be used with `n_iter=0`; the second uses ducc0's
+`pseudo_analysis(maxiter=...)` path and maps `n_iter` to `maxiter`. The tutorial
+compares `ducc0` against `healpy(iter=0)` and compares `ducc0_pseudo` against
+`healpy(iter=N)` with the same requested iteration count `N`.

@@ -57,6 +57,48 @@ nilc = NILC.from_csv(
 )
 ```
 
+球谐变换后端也可以选。默认是 `healpy`；如果环境里安装了 `ducc0`，可以这样用：
+
+```python
+nilc = NILC.from_csv(
+    "configs/bands.csv",
+    "configs/needlets_default.csv",
+    Sm_maps=maps,
+    lmax=500,
+    n_iter=0,
+    sht_backend="ducc0",
+    sht_nthreads=0,
+)
+```
+
+几个 backend 的含义：
+
+| `sht_backend` | `map2alm` 行为 | `n_iter` 含义 | 推荐用途 |
+| --- | --- | --- | --- |
+| `"healpy"` | `healpy.map2alm` | 传给 `healpy.map2alm(iter=...)` | 默认、最稳妥 |
+| `"ducc0"` | `ducc0.sht.adjoint_synthesis`，再乘 pixel area | 必须是 `0` 或 `None` | 和 healpy `iter=0` 做快速非迭代对比 |
+| `"ducc0_pseudo"` | `ducc0.sht.pseudo_analysis` | 传给 `pseudo_analysis(maxiter=...)` | 实验性的 ducc0 迭代 analysis |
+
+`sht_nthreads=0` 表示让 ducc0 使用所有可用 hardware threads。
+
+如果要用 ducc0 的 iterative pseudo-analysis 路径：
+
+```python
+nilc = NILC.from_csv(
+    "configs/bands.csv",
+    "configs/needlets_default.csv",
+    Sm_maps=maps,
+    lmax=500,
+    n_iter=3,
+    sht_backend="ducc0_pseudo",
+    sht_nthreads=0,
+)
+```
+
+这里的 `n_iter` 会传给 `ducc0.sht.pseudo_analysis(maxiter=...)`。它不是
+`healpy.map2alm(iter=...)` 的逐位等价别名，而是另一个迭代求解器；正式切换默认后端前，
+应该先对自己的科学场景比较 map 和 power spectrum。
+
 ## 配置文件
 
 配置文件故意放在包外面，方便教学和实验时修改。这里推荐使用 CSV，
@@ -117,6 +159,7 @@ from tutorials.sim_data import (
 
 - `tutorials/tutorial_nilc.py`：基础 NILC，使用默认 CSV 配置。
 - `tutorials/tutorial_nilc_beam.py`：考虑 beam 的 NILC，使用 beam CSV 配置。
+- `tutorials/tutorial_sht_backend.py`：对比 `healpy`、`ducc0` 和 `ducc0_pseudo` 三种 SHT 后端。
 - `tutorials/tutorial_ilc_bias.py`：ILC bias 检查。
 - `tutorials/tutorial_cpr_ilc.py`：CPR/HILC 相关实验。
 
@@ -126,10 +169,11 @@ from tutorials.sim_data import (
 cd tutorials
 python tutorial_nilc.py
 python tutorial_nilc_beam.py
+python tutorial_sht_backend.py --nsides 128 256 512 --nthreads 0 --pseudo-iter 3
 ```
 
 这些脚本会在本地生成被 git 忽略的目录，例如 `test_data/`、`test_data_beam/`、
-`nilc_weight/`。
+`nilc_weight/` 和 `tutorial_outputs/`。
 
 ## 测试
 
@@ -156,5 +200,9 @@ from openilc import NILC, HILC
 
 ## 高性能计算提示
 
-如果 spherical harmonic transform 成为瓶颈，可以参考 healpy 的源码安装说明，
-安装并配置 `cfitsio`、`healpix`，然后从源码重新编译 `healpy`。
+默认 spherical harmonic transform 后端是 `healpy`。如果安装了可选依赖，也可以在
+NILC 里设置 `sht_backend="ducc0"` 或 `sht_backend="ducc0_pseudo"` 做计算和性能对比。
+前者是快速 adjoint 路径，应配合 `n_iter=0` 使用；后者使用 ducc0 的
+`pseudo_analysis(maxiter=...)`，并把 `n_iter` 映射成 `maxiter`。教程里会把
+`ducc0` 和 `healpy(iter=0)` 比，把 `ducc0_pseudo` 和同样迭代次数 `N` 的
+`healpy(iter=N)` 比。

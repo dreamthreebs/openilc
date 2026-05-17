@@ -11,6 +11,7 @@
 /data
 /test_data
 /test_data_beam
+/tutorial_outputs
 /test
 nilc_dev.py
 nilc_v0.py

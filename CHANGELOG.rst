@@ -11,6 +11,7 @@ Release 1.6, 17th May 2026:
 * remove tracked ``data/`` files and purge ``data/`` from local git history
 * add English and Chinese README usage documentation
 * add lightweight package/config tests under ``tests/``
+* add optional ``ducc0`` and ``ducc0_pseudo`` spherical harmonic transform backends for NILC
 
 Release 1.5, 13th January 2025:
 
