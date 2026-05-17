@@ -2,7 +2,7 @@ from pathlib import Path
 
 import numpy as np
 
-from openilc import HILC, NILC, load_yaml_config
+from openilc import HILC, NILC, load_csv_table
 from tutorials.sim_data import estimate_lmax_from_beam, get_band_table, get_cmb_cls
 
 
@@ -12,8 +12,10 @@ def test_public_imports():
 
 
 def test_external_config_paths_exist():
-    assert Path("configs/default.yaml").exists()
-    assert Path("configs/beam.yaml").exists()
+    assert Path("configs/bands.csv").exists()
+    assert Path("configs/bands_beam.csv").exists()
+    assert Path("configs/needlets_default.csv").exists()
+    assert Path("configs/needlets_beam.csv").exists()
 
 
 def test_sim_data_shapes_and_beam_lmax_estimate():
@@ -24,8 +26,8 @@ def test_sim_data_shapes_and_beam_lmax_estimate():
     assert estimate_lmax_from_beam(63, 1000, bl_floor=1e-4) == 551
 
 
-def test_yaml_config_loader():
-    config = load_yaml_config("configs/beam.yaml")
-    assert config["nilc"]["lmax"] == 1000
-    assert config["bands"][0]["lmax_alm"] == 551
-    assert config["needlets"][-1]["lmax"] == 1000
+def test_csv_config_loader():
+    bands = load_csv_table("configs/bands_beam.csv")
+    needlets = load_csv_table("configs/needlets_beam.csv")
+    assert bands.at[0, "lmax_alm"] == 551
+    assert needlets.at[len(needlets) - 1, "lmax"] == 1000

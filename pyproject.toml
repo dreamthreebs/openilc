@@ -16,7 +16,6 @@ dependencies = [
   "numpy",
   "matplotlib",
   "healpy",
-  "pyyaml",
 ]
 
 [project.optional-dependencies]

@@ -5,7 +5,7 @@ Internal Linear Combination tools for CMB data analysis.
 OPENILC is split into three layers:
 
 - `openilc/`: the installable core package, currently exposing `NILC` and `HILC`.
-- External YAML configuration files under `configs/`.
+- External CSV configuration files under `configs/`.
 - Tutorial helpers and scripts under `tutorials/`.
 
 This keeps the algorithm reusable while leaving experiment settings easy to edit.
@@ -33,10 +33,12 @@ from openilc import NILC
 
 maps = np.load("./test_data/sim_cfn.npy")
 
-nilc = NILC.from_config(
-    "configs/default.yaml",
+nilc = NILC.from_csv(
+    "configs/bands.csv",
+    "configs/needlets_default.csv",
     weights_name="./nilc_weight/w_map.npz",
     Sm_maps=maps,
+    lmax=500,
     n_iter=1,
     weight_in_alm=False,
 )
@@ -47,20 +49,25 @@ clean_map = nilc.run_nilc()
 For beam-aware runs, use the beam configuration:
 
 ```python
-nilc = NILC.from_config(
-    "configs/beam.yaml",
+nilc = NILC.from_csv(
+    "configs/bands_beam.csv",
+    "configs/needlets_beam.csv",
     Sm_maps=maps,
+    lmax=1000,
     n_iter=1,
 )
 ```
 
 ## Configuration
 
-Configuration is intentionally outside the Python package. YAML is the
-recommended format because it is readable, editable, and can include comments.
+Configuration is intentionally outside the Python package. CSV is the
+recommended format here because the configuration is naturally tabular and easy
+to compare by eye.
 
-- `configs/default.yaml`: basic NILC tutorial configuration.
-- `configs/beam.yaml`: beam-aware NILC tutorial configuration.
+- `configs/bands.csv`: basic frequency-channel configuration.
+- `configs/bands_beam.csv`: beam-aware frequency-channel configuration.
+- `configs/needlets_default.csv`: default needlet bins.
+- `configs/needlets_beam.csv`: beam-aware needlet bins.
 
 Important rules:
 
@@ -72,13 +79,15 @@ Important rules:
 - `lmax_alm` controls which channels are usable at each needlet scale. In
   `NILC.calc_beta_for_scale`, channels with `lmax_alm < beta_lmax` are dropped.
 
-Recommended YAML usage:
+Recommended CSV usage:
 
 ```python
-nilc = NILC.from_config(
-    "configs/beam.yaml",
+nilc = NILC.from_csv(
+    "configs/bands_beam.csv",
+    "configs/needlets_beam.csv",
     Sm_maps=maps,
     weights_name="./nilc_weight/w_alm.npz",
+    lmax=1000,
     n_iter=1,
 )
 ```
@@ -106,14 +115,14 @@ from tutorials.sim_data import (
 `estimate_lmax_from_beam(beam_arcmin, lmax, bl_floor=1e-4)` is kept for teaching:
 it shows where a Gaussian beam transfer function becomes small enough that
 deconvolution is numerically risky. The actual beam tutorial still uses the
-configured `lmax_alm` from `configs/beam.yaml`.
+configured `lmax_alm` from `configs/bands_beam.csv`.
 
 ## Tutorials
 
 The tutorial scripts are examples, not pytest tests:
 
-- `tutorials/tutorial_nilc.py`: basic NILC example using `configs/default.yaml`.
-- `tutorials/tutorial_nilc_beam.py`: beam-aware NILC example using `configs/beam.yaml`.
+- `tutorials/tutorial_nilc.py`: basic NILC example using the default CSV configs.
+- `tutorials/tutorial_nilc_beam.py`: beam-aware NILC example using the beam CSV configs.
 - `tutorials/tutorial_ilc_bias.py`: ILC bias tutorial.
 - `tutorials/tutorial_cpr_ilc.py`: CPR/HILC experiments.
 

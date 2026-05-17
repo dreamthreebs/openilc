@@ -80,7 +80,7 @@ def run_nilc_w_alm():
     # do nilc and save the weights in alm
     time0 = time.time()
     sim = np.load('./test_data_beam/sim_cfn.npy')
-    obj_nilc = NILC.from_config("configs/beam.yaml", weights_name='./nilc_weight/w_alm.npz', Sm_maps=sim, mask=None, lmax=lmax, nside=nside, n_iter=1)
+    obj_nilc = NILC.from_csv("configs/bands_beam.csv", "configs/needlets_beam.csv", weights_name='./nilc_weight/w_alm.npz', Sm_maps=sim, mask=None, lmax=lmax, nside=nside, n_iter=1)
     clean_map = obj_nilc.run_nilc()
     np.save('./test_data_beam/cln_cmb_w_alm.npy', clean_map)
     print(f'{time.time()-time0=}')
@@ -88,14 +88,14 @@ def run_nilc_w_alm():
 def get_fg_res_w_alm():
     # this function tells you how to debias other component by using the weights in alm
     fg = np.load('./test_data_beam/sim_f.npy')
-    obj_nilc = NILC.from_config("configs/beam.yaml", weights_config='./nilc_weight/w_alm.npz', Sm_maps=fg, mask=None, lmax=lmax, nside=nside, n_iter=1)
+    obj_nilc = NILC.from_csv("configs/bands_beam.csv", "configs/needlets_beam.csv", weights_config='./nilc_weight/w_alm.npz', Sm_maps=fg, mask=None, lmax=lmax, nside=nside, n_iter=1)
     fg_res = obj_nilc.run_nilc()
     np.save('./test_data_beam/fg_res_w_alm.npy', fg_res)
 
 def get_n_res_w_alm():
     # calc noise bias term
     noise = np.load('./test_data_beam/sim_n.npy')
-    obj_nilc = NILC.from_config("configs/beam.yaml", weights_config='./nilc_weight/w_alm.npz', Sm_maps=noise, mask=None, lmax=lmax, nside=nside, n_iter=1)
+    obj_nilc = NILC.from_csv("configs/bands_beam.csv", "configs/needlets_beam.csv", weights_config='./nilc_weight/w_alm.npz', Sm_maps=noise, mask=None, lmax=lmax, nside=nside, n_iter=1)
     fg_res = obj_nilc.run_nilc()
     np.save('./test_data_beam/n_res_w_alm.npy', fg_res)
 
@@ -103,7 +103,7 @@ def run_nilc_w_map():
     # do nilc and save the weights in map
     time0 = time.time()
     sim = np.load('./test_data_beam/sim_cfn.npy')
-    obj_nilc = NILC.from_config("configs/beam.yaml", weights_name='./nilc_weight/w_map.npz', Sm_maps=sim, mask=None, lmax=lmax, nside=nside, n_iter=1, weight_in_alm=False)
+    obj_nilc = NILC.from_csv("configs/bands_beam.csv", "configs/needlets_beam.csv", weights_name='./nilc_weight/w_map.npz', Sm_maps=sim, mask=None, lmax=lmax, nside=nside, n_iter=1, weight_in_alm=False)
     clean_map = obj_nilc.run_nilc()
     np.save('./test_data_beam/cln_cmb_w_map.npy', clean_map)
     print(f'{time.time()-time0=}')
@@ -111,14 +111,14 @@ def run_nilc_w_map():
 def get_fg_res_w_map():
     # this function tells you how to debias other component by using the weights in map
     fg = np.load('./test_data_beam/sim_f.npy')
-    obj_nilc = NILC.from_config("configs/beam.yaml", weights_config='./nilc_weight/w_map.npz', Sm_maps=fg, mask=None, lmax=lmax, nside=nside, n_iter=1, weight_in_alm=False)
+    obj_nilc = NILC.from_csv("configs/bands_beam.csv", "configs/needlets_beam.csv", weights_config='./nilc_weight/w_map.npz', Sm_maps=fg, mask=None, lmax=lmax, nside=nside, n_iter=1, weight_in_alm=False)
     fg_res = obj_nilc.run_nilc()
     np.save('./test_data_beam/fg_res_w_map.npy', fg_res)
 
 def get_n_res_w_map():
     # noise bias term
     noise = np.load('./test_data_beam/sim_n.npy')
-    obj_nilc = NILC.from_config("configs/beam.yaml", weights_config='./nilc_weight/w_map.npz', Sm_maps=noise, mask=None, lmax=lmax, nside=nside, n_iter=1, weight_in_alm=False)
+    obj_nilc = NILC.from_csv("configs/bands_beam.csv", "configs/needlets_beam.csv", weights_config='./nilc_weight/w_map.npz', Sm_maps=noise, mask=None, lmax=lmax, nside=nside, n_iter=1, weight_in_alm=False)
     fg_res = obj_nilc.run_nilc()
     np.save('./test_data_beam/n_res_w_map.npy', fg_res)
 

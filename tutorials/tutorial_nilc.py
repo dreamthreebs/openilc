@@ -69,7 +69,7 @@ def run_nilc_w_alm():
     # do nilc and save the weights in alm
     time0 = time.time()
     sim = np.load("./test_data/sim_cfn.npy")
-    obj_nilc = NILC.from_config("configs/default.yaml",
+    obj_nilc = NILC.from_csv("configs/bands.csv", "configs/needlets_default.csv",
         weights_name="./nilc_weight/w_alm.npz",
         Sm_maps=sim,
         mask=None,
@@ -86,7 +86,7 @@ def run_nilc_w_alm():
 def get_fg_res_w_alm():
     # this function tells you how to debias other component by using the weights in alm
     fg = np.load("./test_data/sim_f.npy")
-    obj_nilc = NILC.from_config("configs/default.yaml",
+    obj_nilc = NILC.from_csv("configs/bands.csv", "configs/needlets_default.csv",
         weights_config="./nilc_weight/w_alm.npz",
         Sm_maps=fg,
         mask=None,
@@ -101,7 +101,7 @@ def get_fg_res_w_alm():
 def get_n_res_w_alm():
     # calc noise bias
     noise = np.load("./test_data/sim_n.npy")
-    obj_nilc = NILC.from_config("configs/default.yaml",
+    obj_nilc = NILC.from_csv("configs/bands.csv", "configs/needlets_default.csv",
         weights_config="./nilc_weight/w_alm.npz",
         Sm_maps=noise,
         mask=None,
@@ -117,7 +117,7 @@ def run_nilc_w_map():
     # do nilc and save the weights in map
     time0 = time.time()
     sim = np.load("./test_data/sim_cfn.npy")
-    obj_nilc = NILC.from_config("configs/default.yaml",
+    obj_nilc = NILC.from_csv("configs/bands.csv", "configs/needlets_default.csv",
         weights_name="./nilc_weight/w_map.npz",
         Sm_maps=sim,
         mask=None,
@@ -135,7 +135,7 @@ def run_nilc_w_map():
 def get_fg_res_w_map():
     # this function tells you how to debias other component by using the weights in map
     fg = np.load("./test_data/sim_f.npy")
-    obj_nilc = NILC.from_config("configs/default.yaml",
+    obj_nilc = NILC.from_csv("configs/bands.csv", "configs/needlets_default.csv",
         weights_config="./nilc_weight/w_map.npz",
         Sm_maps=fg,
         mask=None,
@@ -151,7 +151,7 @@ def get_fg_res_w_map():
 def get_n_res_w_map():
     # calc noise bias
     noise = np.load("./test_data/sim_n.npy")
-    obj_nilc = NILC.from_config("configs/default.yaml",
+    obj_nilc = NILC.from_csv("configs/bands.csv", "configs/needlets_default.csv",
         weights_config="./nilc_weight/w_map.npz",
         Sm_maps=noise,
         mask=None,
@@ -167,7 +167,7 @@ def get_n_res_w_map():
 def get_cmb_res_w_map():
     # calc noise bias
     cmb = np.asarray([np.load("./test_data/sim_c.npy")] * 5)
-    obj_nilc = NILC.from_config("configs/default.yaml",
+    obj_nilc = NILC.from_csv("configs/bands.csv", "configs/needlets_default.csv",
         weights_config="./nilc_weight/w_map.npz",
         Sm_maps=cmb,
         mask=None,

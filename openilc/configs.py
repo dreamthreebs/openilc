@@ -1,3 +1,5 @@
+import csv
+
 import numpy as np
 
 
@@ -38,12 +40,10 @@ def load_table(value):
         return value
     if isinstance(value, (list, tuple)):
         return ConfigTable(value)
-    raise TypeError("configuration tables must come from YAML lists or ConfigTable")
+    raise TypeError("configuration tables must be CSV-loaded, lists, or ConfigTable")
 
 
-def load_yaml_config(path):
-    import yaml
-
+def load_csv_table(path):
     with open(path) as stream:
-        config = yaml.safe_load(stream)
-    return config or {}
+        rows = list(csv.DictReader(stream, skipinitialspace=True))
+    return ConfigTable(rows)

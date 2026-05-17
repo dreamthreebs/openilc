@@ -4,8 +4,8 @@ Unreleased
 Release 1.6, 17th May 2026:
 * package core algorithms under ``openilc`` and use ``from openilc import NILC, HILC``
 * add editable-install packaging with ``pyproject.toml``
-* replace CSV configuration files with YAML configs in ``configs/default.yaml`` and ``configs/beam.yaml``
-* add ``NILC.from_config(...)`` as the recommended YAML configuration entry point
+* move CSV configuration files into ``configs/`` with clearer names for bands and needlets
+* add ``NILC.from_csv(...)`` as the recommended configuration entry point
 * move tutorials and simulation helpers into ``tutorials/``
 * generate tutorial CMB and foreground inputs at runtime with CAMB and PySM3 instead of storing ``data/`` in the repository
 * remove tracked ``data/`` files and purge ``data/`` from local git history

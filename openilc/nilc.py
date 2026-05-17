@@ -4,7 +4,7 @@ import healpy as hp
 import gc
 
 from pathlib import Path
-from .configs import load_table, load_yaml_config
+from .configs import load_csv_table, load_table
 
 class NILC:
     def __init__(self, bandinfo, needlet_config, weights_name=None, weights_config=None, Sm_alms=None, Sm_maps=None, mask=None, lmax=1000, nside=1024, Rtol=1/1000, n_iter=3, weight_in_alm=True):
@@ -100,14 +100,11 @@ class NILC:
         print(f'{Rtol=}, {lmax=}, nside={self.nside}')
 
     @classmethod
-    def from_config(cls, config, **kwargs):
-        loaded = load_yaml_config(config)
-        nilc_params = dict(loaded.get("nilc", {}))
-        nilc_params.update(kwargs)
+    def from_csv(cls, bands, needlets, **kwargs):
         return cls(
-            bandinfo=loaded["bands"],
-            needlet_config=loaded["needlets"],
-            **nilc_params,
+            bandinfo=load_csv_table(bands),
+            needlet_config=load_csv_table(needlets),
+            **kwargs,
         )
 
     def calc_hl(self):
