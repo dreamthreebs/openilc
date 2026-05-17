@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import healpy as hp
 import time
+import argparse
 
 from pathlib import Path
 
@@ -18,6 +19,30 @@ nside = 512
 npix = hp.nside2npix(nside)
 lmax = 500
 R_tol = 1 / 100
+TEST_DATA = Path("./test_data")
+NILC_WEIGHT = Path("./nilc_weight")
+MAP_RTOLS = (1 / 100, 1 / 500, 1 / 1000)
+BIAS_RTOLS = (1 / 100, 1 / 1000)
+
+
+def _rtol_name(rtol):
+    return str(rtol)
+
+
+def _map_result_paths(rtol):
+    name = _rtol_name(rtol)
+    paths = [
+        TEST_DATA / f"cln_cmb_w_map_{name}.npy",
+        TEST_DATA / f"fg_res_w_map_{name}.npy",
+        TEST_DATA / f"n_res_w_map_{name}.npy",
+    ]
+    if rtol in BIAS_RTOLS:
+        paths.append(TEST_DATA / f"c_res_w_map_{name}.npy")
+    return paths
+
+
+def _missing(paths):
+    return [path for path in paths if not path.exists()]
 
 
 def gen_sim():
@@ -46,7 +71,7 @@ def gen_sim():
         fg_list.append(fg)
         n_list.append(noise)
 
-    Path("./test_data").mkdir(exist_ok=True, parents=True)
+    TEST_DATA.mkdir(exist_ok=True, parents=True)
     np.save("./test_data/sim_cfn.npy", sim_list)
     np.save("./test_data/sim_c.npy", cmb)
     np.save("./test_data/sim_f.npy", fg_list)
@@ -83,7 +108,7 @@ def gen_sim_alm():
         fg_list.append(fg_alm)
         n_list.append(noise_alm)
 
-    Path("./test_data").mkdir(exist_ok=True, parents=True)
+    TEST_DATA.mkdir(exist_ok=True, parents=True)
     np.save("./test_data/sim_cfn_alm.npy", sim_list)
     np.save("./test_data/sim_c_alm.npy", cmb_alm)
     np.save("./test_data/sim_f_alm.npy", fg_list)
@@ -256,9 +281,66 @@ def get_cmb_res_w_map(R_tol=1 / 1000):
     np.save(f"./test_data/c_res_w_map_{R_tol}.npy", cmb_res)
 
 
+def prepare_check_inputs(force=False):
+    map_inputs = [
+        TEST_DATA / "sim_cfn.npy",
+        TEST_DATA / "sim_c.npy",
+        TEST_DATA / "sim_f.npy",
+        TEST_DATA / "sim_n.npy",
+    ]
+    alm_inputs = [
+        TEST_DATA / "sim_cfn_alm.npy",
+        TEST_DATA / "sim_c_alm.npy",
+        TEST_DATA / "sim_f_alm.npy",
+        TEST_DATA / "sim_n_alm.npy",
+    ]
+
+    if force or _missing(map_inputs):
+        print("Generating map-space simulations...")
+        gen_sim()
+    if force or _missing(alm_inputs):
+        print("Generating harmonic-space simulations...")
+        gen_sim_alm()
+
+    NILC_WEIGHT.mkdir(exist_ok=True, parents=True)
+    for rtol in MAP_RTOLS:
+        if not force and not _missing(_map_result_paths(rtol)):
+            continue
+
+        print(f"Generating NILC map-weight products for R_tol={rtol}...")
+        run_nilc_w_map(R_tol=rtol)
+        get_fg_res_w_map(R_tol=rtol)
+        get_n_res_w_map(R_tol=rtol)
+        if rtol in BIAS_RTOLS:
+            get_cmb_res_w_map(R_tol=rtol)
+
+
+def validate_check_inputs():
+    required = [
+        TEST_DATA / "sim_c.npy",
+        TEST_DATA / "sim_cfn_alm.npy",
+        TEST_DATA / "sim_c_alm.npy",
+        TEST_DATA / "sim_f_alm.npy",
+        TEST_DATA / "sim_n_alm.npy",
+    ]
+    for rtol in MAP_RTOLS:
+        required.extend(_map_result_paths(rtol))
+
+    missing = _missing(required)
+    if missing:
+        formatted = "\n".join(f"  - {path}" for path in missing)
+        raise FileNotFoundError(
+            "missing CPR tutorial input files:\n"
+            f"{formatted}\n"
+            "Run `python tutorials/tutorial_cpr_ilc.py --prepare-only` first, "
+            "or run without `--check-only` to generate them automatically."
+        )
+
+
 def check_res():
     # check result compared with input and the foreground residual and noise bias
     # save weights in alm or map should not affect the final results so there lines in plots are overlapped
+    validate_check_inputs()
 
     l = np.arange(lmax + 1)
 
@@ -404,30 +486,31 @@ def check_res():
 
 
 def main():
-    # gen_sim()
-    gen_sim_alm()
+    parser = argparse.ArgumentParser(
+        description="Run the CPR/HILC tutorial and generate missing intermediate files."
+    )
+    parser.add_argument(
+        "--prepare-only",
+        action="store_true",
+        help="generate missing simulation and NILC residual files, then exit",
+    )
+    parser.add_argument(
+        "--check-only",
+        action="store_true",
+        help="only read existing files and plot/check results",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="regenerate intermediate files even if they already exist",
+    )
+    args = parser.parse_args()
 
-    # run_hilc()
-    # run_nilc_w_alm()
-    # get_fg_res_w_alm()
-    # get_n_res_w_alm()
-
-    # run_nilc_w_map()
-    # get_fg_res_w_map()
-    # get_n_res_w_map()
-    # get_cmb_res_w_map()
-    #
-
-    # run_nilc_w_map(R_tol=1 / 100)
-    # get_fg_res_w_map(R_tol=1 / 100)
-    # get_n_res_w_map(R_tol=1 / 100)
-    # get_cmb_res_w_map(R_tol=1 / 100)
-    #
-    # run_nilc_w_map(R_tol=1 / 500)
-    # get_fg_res_w_map(R_tol=1 / 500)
-    # get_n_res_w_map(R_tol=1 / 500)
-    #
-    check_res()
+    if not args.check_only:
+        prepare_check_inputs(force=args.force)
+    if not args.prepare_only:
+        check_res()
 
 
-main()
+if __name__ == "__main__":
+    main()

@@ -7,6 +7,11 @@ from pathlib import Path
 from .configs import load_csv_table, load_table
 from .sht import get_sht_backend
 
+
+_BAND_COLUMNS = ("lmax_alm",)
+_NEEDLET_COLUMNS = ("lmin", "lpeak", "lmax", "nside")
+
+
 class NILC:
     def __init__(self, bandinfo, needlet_config, weights_name=None, weights_config=None, Sm_alms=None, Sm_maps=None, mask=None, lmax=1000, nside=1024, Rtol=1/1000, n_iter=3, weight_in_alm=True, sht_backend="healpy", sht_nthreads=None):
 
@@ -69,14 +74,19 @@ class NILC:
         self.lmax = lmax
         self.n_iter = n_iter
 
+        self._validate_basic_inputs(
+            weights_name=weights_name,
+            weights_config=weights_config,
+            Sm_maps=Sm_maps,
+            Sm_alms=Sm_alms,
+            mask=mask,
+            nside=nside,
+            lmax=lmax,
+            Rtol=Rtol,
+        )
+
         if sht_backend == "ducc0" and n_iter not in (0, None):
             raise ValueError("ducc0 backend requires n_iter=0 or n_iter=None")
-
-        if (weights_config is not None) and (weights_name is not None):
-            raise ValueError('weights should not be given and calculated at the same time!')
-
-        if (Sm_maps is None) and (Sm_alms is None):
-            raise ValueError('no input!')
 
         if Sm_maps is not None:
             self.nmaps = Sm_maps.shape[0]
@@ -109,6 +119,154 @@ class NILC:
 
         print(f'{weights_config=}, {weights_name=}, {needlet_config=}')
         print(f'{Rtol=}, {lmax=}, nside={self.nside}, sht_backend={self.sht_backend}')
+
+    def _validate_basic_inputs(
+        self,
+        *,
+        weights_name,
+        weights_config,
+        Sm_maps,
+        Sm_alms,
+        mask,
+        nside,
+        lmax,
+        Rtol,
+    ):
+        if weights_config is not None and weights_name is not None:
+            raise ValueError("weights_config and weights_name cannot both be given")
+
+        if Sm_maps is None and Sm_alms is None:
+            raise ValueError("either Sm_maps or Sm_alms must be provided")
+
+        if not isinstance(lmax, (int, np.integer)) or lmax < 0:
+            raise ValueError("lmax must be a non-negative integer")
+
+        if Rtol <= 0:
+            raise ValueError("Rtol must be positive")
+
+        self._validate_config_tables(lmax)
+
+        if Sm_maps is not None:
+            Sm_maps = np.asarray(Sm_maps)
+            if Sm_maps.ndim != 2:
+                raise ValueError("Sm_maps must have shape (n_freq, n_pixel)")
+            if not hp.isnpixok(Sm_maps.shape[1]):
+                raise ValueError(
+                    "Sm_maps has an invalid HEALPix pixel count: "
+                    f"{Sm_maps.shape[1]}"
+                )
+            if mask is not None and np.asarray(mask).shape != (Sm_maps.shape[1],):
+                raise ValueError(
+                    "mask must have shape (n_pixel,), matching Sm_maps; "
+                    f"got {np.asarray(mask).shape}"
+                )
+            self._validate_channel_count(Sm_maps.shape[0])
+
+        if Sm_alms is not None:
+            Sm_alms = np.asarray(Sm_alms)
+            if Sm_alms.ndim != 2:
+                raise ValueError("Sm_alms must have shape (n_freq, n_alm)")
+            if not hp.isnsideok(nside):
+                raise ValueError(f"nside must be a valid HEALPix nside; got {nside}")
+            alm_lmax = hp.Alm.getlmax(Sm_alms.shape[1])
+            if alm_lmax < lmax:
+                raise ValueError(
+                    "Sm_alms does not contain enough harmonic modes for lmax="
+                    f"{lmax}; inferred alm lmax is {alm_lmax}"
+                )
+            self._validate_channel_count(Sm_alms.shape[0])
+
+        if Sm_maps is not None and Sm_alms is not None:
+            if np.asarray(Sm_maps).shape[0] != np.asarray(Sm_alms).shape[0]:
+                raise ValueError("Sm_maps and Sm_alms must have the same n_freq")
+
+    def _validate_config_tables(self, lmax):
+        if len(self.bandinfo) == 0:
+            raise ValueError("bandinfo must contain at least one row")
+        if len(self.needlet) == 0:
+            raise ValueError("needlet_config must contain at least one row")
+
+        self._require_columns(self.bandinfo, _BAND_COLUMNS, "bandinfo")
+        self._require_columns(self.needlet, _NEEDLET_COLUMNS, "needlet_config")
+
+        previous_lmax = None
+        for j, row in enumerate(self.needlet.rows):
+            n_lmin = row["lmin"]
+            n_lpeak = row["lpeak"]
+            n_lmax = row["lmax"]
+            nside = row["nside"]
+
+            if not all(isinstance(value, (int, np.integer)) for value in (n_lmin, n_lpeak, n_lmax, nside)):
+                raise ValueError(
+                    "needlet_config rows must use integer lmin, lpeak, lmax, "
+                    f"and nside values; row {j} is {row}"
+                )
+            if n_lmin < 0 or n_lpeak < 0 or n_lmax < 0:
+                raise ValueError(f"needlet_config row {j} has negative ell values")
+            if not (n_lmin <= n_lpeak <= n_lmax):
+                raise ValueError(
+                    "needlet_config row "
+                    f"{j} must satisfy lmin <= lpeak <= lmax"
+                )
+            if n_lmax > lmax:
+                raise ValueError(
+                    f"needlet_config row {j} has lmax={n_lmax}, exceeding "
+                    f"NILC lmax={lmax}"
+                )
+            if not hp.isnsideok(nside):
+                raise ValueError(
+                    f"needlet_config row {j} has invalid HEALPix nside={nside}"
+                )
+            if previous_lmax is not None and n_lmin > previous_lmax:
+                raise ValueError(
+                    f"needlet_config row {j} leaves a gap after lmax="
+                    f"{previous_lmax}"
+                )
+            previous_lmax = n_lmax
+
+        final_lmax = self.needlet.at[len(self.needlet) - 1, "lmax"]
+        if final_lmax != lmax:
+            raise ValueError(
+                "NILC lmax must match the last needlet lmax; "
+                f"got lmax={lmax}, last needlet lmax={final_lmax}"
+            )
+
+        for i, row in enumerate(self.bandinfo.rows):
+            lmax_alm = row["lmax_alm"]
+            if not isinstance(lmax_alm, (int, np.integer)) or lmax_alm < 0:
+                raise ValueError(
+                    f"bandinfo row {i} must have a non-negative integer lmax_alm"
+                )
+
+    @staticmethod
+    def _require_columns(table, columns, table_name):
+        for column in columns:
+            missing_rows = [
+                str(i) for i, row in enumerate(table.rows) if column not in row
+            ]
+            if missing_rows:
+                raise ValueError(
+                    f"{table_name} is missing required column '{column}' "
+                    f"in row(s): {', '.join(missing_rows)}"
+                )
+
+    def _validate_channel_count(self, n_freq):
+        if n_freq != len(self.bandinfo):
+            raise ValueError(
+                "number of input channels must match bandinfo rows; "
+                f"got n_freq={n_freq}, bandinfo rows={len(self.bandinfo)}"
+            )
+
+        for j, row in enumerate(self.needlet.rows):
+            active_channels = sum(
+                band["lmax_alm"] >= row["lmax"] for band in self.bandinfo.rows
+            )
+            if active_channels < 2:
+                raise ValueError(
+                    f"needlet scale {j} keeps only {active_channels} channel(s) "
+                    f"after applying lmax_alm >= {row['lmax']}; at least 2 "
+                    "channels are required"
+                )
 
     @classmethod
     def from_csv(cls, bands, needlets, **kwargs):
@@ -277,7 +435,7 @@ class NILC:
 
         res_map = self.calc_map()
 
-        if self.weights_config is None:
+        if self.weights_config is None and self.weights_name is not None:
             np.savez(self.weights_name, *self.weights)
 
         print('Calculation completed!')

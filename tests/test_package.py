@@ -35,6 +35,43 @@ def test_csv_config_loader():
     assert needlets.at[len(needlets) - 1, "lmax"] == 1000
 
 
+def test_nilc_validates_lmax_matches_needlets():
+    bands = [{"lmax_alm": 9}, {"lmax_alm": 9}]
+    needlets = [{"lmin": 0, "lpeak": 0, "lmax": 8, "nside": 8}]
+    alms = np.zeros((2, hp.Alm.getsize(9)), dtype=complex)
+
+    with pytest.raises(ValueError, match="last needlet lmax"):
+        NILC(bands, needlets, Sm_alms=alms, lmax=9, nside=8)
+
+
+def test_nilc_validates_channel_count_matches_bandinfo():
+    bands = [{"lmax_alm": 8}]
+    needlets = [{"lmin": 0, "lpeak": 0, "lmax": 8, "nside": 8}]
+    alms = np.zeros((2, hp.Alm.getsize(8)), dtype=complex)
+
+    with pytest.raises(ValueError, match="bandinfo rows"):
+        NILC(bands, needlets, Sm_alms=alms, lmax=8, nside=8)
+
+
+def test_nilc_validates_mask_shape():
+    bands = [{"lmax_alm": 8}, {"lmax_alm": 8}]
+    needlets = [{"lmin": 0, "lpeak": 0, "lmax": 8, "nside": 8}]
+    maps = np.zeros((2, hp.nside2npix(8)))
+    mask = np.ones(hp.nside2npix(4))
+
+    with pytest.raises(ValueError, match="mask must have shape"):
+        NILC(bands, needlets, Sm_maps=maps, mask=mask, lmax=8)
+
+
+def test_nilc_validates_active_channels_per_needlet_scale():
+    bands = [{"lmax_alm": 4}, {"lmax_alm": 8}]
+    needlets = [{"lmin": 0, "lpeak": 0, "lmax": 8, "nside": 8}]
+    alms = np.zeros((2, hp.Alm.getsize(8)), dtype=complex)
+
+    with pytest.raises(ValueError, match="at least 2 channels"):
+        NILC(bands, needlets, Sm_alms=alms, lmax=8, nside=8)
+
+
 def test_ducc0_sht_backend_matches_healpy_iter0():
     ducc0 = pytest.importorskip("ducc0")
     assert ducc0 is not None
