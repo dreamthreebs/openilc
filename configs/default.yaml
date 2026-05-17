@@ -1,0 +1,59 @@
+# Basic NILC tutorial configuration.
+# Edit this file when you want to change the frequency channels or needlet bins.
+
+nilc:
+  lmax: 500
+
+bands:
+  - band: 1
+    freq: 40
+    beam: 63
+    lmax_alm: 2000
+  - band: 2
+    freq: 95
+    beam: 30
+    lmax_alm: 2000
+  - band: 3
+    freq: 155
+    beam: 17
+    lmax_alm: 2000
+  - band: 4
+    freq: 215
+    beam: 11
+    lmax_alm: 2000
+  - band: 5
+    freq: 270
+    beam: 9
+    lmax_alm: 2000
+
+needlets:
+  - index: 1
+    lmin: 0
+    lpeak: 0
+    lmax: 50
+    nside: 32
+  - index: 2
+    lmin: 0
+    lpeak: 50
+    lmax: 100
+    nside: 64
+  - index: 3
+    lmin: 50
+    lpeak: 100
+    lmax: 150
+    nside: 128
+  - index: 4
+    lmin: 100
+    lpeak: 150
+    lmax: 250
+    nside: 128
+  - index: 5
+    lmin: 150
+    lpeak: 250
+    lmax: 400
+    nside: 256
+  - index: 6
+    lmin: 250
+    lpeak: 400
+    lmax: 500
+    nside: 256

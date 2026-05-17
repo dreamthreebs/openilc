@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openilc"
+version = "0.1.0"
+description = "Internal linear combination tools for CMB data analysis"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {file = "LICENSE"}
+authors = [
+  {name = "OPENILC maintainers"}
+]
+dependencies = [
+  "numpy",
+  "matplotlib",
+  "healpy",
+  "pyyaml",
+]
+
+[project.optional-dependencies]
+tutorial = [
+  "camb",
+  "pysm3",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["openilc*"]

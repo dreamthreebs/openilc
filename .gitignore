@@ -3,9 +3,12 @@
 /**/*.fits
 /**/*.log
 /**/*.pkl
+/**/.DS_Store
+/**/.DS_store
 /**/__pycache__
 /**/nilc_weight
 /**/submit.sh
+/data
 /test_data
 /test_data_beam
 /test
@@ -14,4 +17,3 @@ nilc_v0.py
 nilc_memory.py
 nilc_gpt.py
 test_nilc_dev.py
-

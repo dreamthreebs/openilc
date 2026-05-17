@@ -1,11 +1,18 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import healpy as hp
-import pandas as pd
 import time
 
 from pathlib import Path
-from nilc import NILC
+
+ROOT = Path(__file__).resolve().parents[1]
+import sys
+sys.path.insert(0, str(ROOT))
+import os
+os.chdir(ROOT)
+
+from openilc import NILC
+from tutorials.sim_data import estimate_lmax_from_beam, get_band_table, get_cmb_cls, get_foreground
 # from memory_profiler import profile
 
 nside = 512
@@ -18,23 +25,24 @@ def gen_sim():
     cmb_list = []
     fg_list = []
     noise_list = []
-    # df = pd.read_csv('/afs/ihep.ac.cn/users/w/wangyiming25/work/dc2/psilc/FGSim/FreqBand5') # for ali users
-    # cl_cmb = np.load('/afs/ihep.ac.cn/users/w/wangyiming25/work/dc2/psilc/src/cmbsim/cmbdata/cmbcl_8k.npy').T[0] # for ali users
-    df = pd.read_csv('./data/FreqBand5')
-    cl_cmb = np.load('./data/cmb/cmbcl_8k.npy').T[0]
+    bands = get_band_table(beam_version=True)
+    cl_cmb = get_cmb_cls(lmax=8000).T[0]
     print(f'{cl_cmb.shape=}')
 
     l = np.arange(lmax+1)
 
-    bl_floor = 1e-4
-    for freq_idx in range(len(df)):
-        freq = df.at[freq_idx, 'freq']
-        beam = df.at[freq_idx, 'beam']
+    for band in bands:
+        freq = band['freq']
+        beam = band['beam']
+        config_lmax_alm = band['lmax_alm']
         print(f'{freq=}, {beam=}')
         bl = hp.gauss_beam(fwhm=np.deg2rad(beam)/60, lmax=lmax)
 
-        lmax_alm = np.argmax(bl < bl_floor) if np.any(bl < bl_floor) else lmax
-        print(f"The index where the value is smaller than {bl_floor} is: {lmax_alm}")
+        bl_floor = 1e-4
+        floor_lmax_alm = estimate_lmax_from_beam(beam, lmax, bl_floor=bl_floor)
+        lmax_alm = min(config_lmax_alm, lmax)
+        deconv_filter = 1 / bl[: lmax_alm + 1]
+        print(f'{bl_floor=}, {floor_lmax_alm=}, {config_lmax_alm=}, using {lmax_alm=}')
 
         np.random.seed(seed=0)
         cmb = hp.synfast(cls=cl_cmb, nside=nside, fwhm=np.deg2rad(beam)/60)
@@ -45,18 +53,16 @@ def gen_sim():
         # plt.legend()
         # plt.show()
 
-        # fg = np.load(f'/afs/ihep.ac.cn/users/w/wangyiming25/work/dc2/psilc/FGSim/FG5/{freq}.npy')[0] # for ali users
-        # nstd = np.load(f'/afs/ihep.ac.cn/users/w/wangyiming25/work/dc2/psilc/FGSim/NSTDNORTH5/{freq}.npy')[0] # for ali users
-        fg = np.load(f'./data/fg/{freq}.npy')
-        nstd = df.at[freq_idx, 'nstd']
+        fg = get_foreground(freq, nside)
+        nstd = band['nstd']
         noise = nstd * np.random.normal(loc=0, scale=1, size=(npix,))
 
         sim_with_beam = cmb + fg + noise
 
-        sim = hp.alm2map(hp.almxfl(hp.map2alm(sim_with_beam, lmax=lmax_alm), fl=1/bl), nside=nside)
-        cmb = hp.alm2map(hp.almxfl(hp.map2alm(cmb, lmax=lmax_alm), fl=1/bl), nside=nside)
-        fg = hp.alm2map(hp.almxfl(hp.map2alm(fg, lmax=lmax_alm), fl=1/bl), nside=nside)
-        noise = hp.alm2map(hp.almxfl(hp.map2alm(noise, lmax=lmax_alm), fl=1/bl), nside=nside)
+        sim = hp.alm2map(hp.almxfl(hp.map2alm(sim_with_beam, lmax=lmax_alm), fl=deconv_filter), nside=nside)
+        cmb = hp.alm2map(hp.almxfl(hp.map2alm(cmb, lmax=lmax_alm), fl=deconv_filter), nside=nside)
+        fg = hp.alm2map(hp.almxfl(hp.map2alm(fg, lmax=lmax_alm), fl=deconv_filter), nside=nside)
+        noise = hp.alm2map(hp.almxfl(hp.map2alm(noise, lmax=lmax_alm), fl=deconv_filter), nside=nside)
 
         sim_list.append(sim)
         cmb_list.append(cmb)
@@ -70,11 +76,11 @@ def gen_sim():
     np.save('./test_data_beam/sim_f.npy', fg_list)
     np.save('./test_data_beam/sim_n.npy', noise_list)
 
-def test_nilc_w_alm():
+def run_nilc_w_alm():
     # do nilc and save the weights in alm
     time0 = time.time()
     sim = np.load('./test_data_beam/sim_cfn.npy')
-    obj_nilc = NILC(bandinfo='./bandinfo_beam.csv', needlet_config='./needlets/beam_version.csv', weights_name='./nilc_weight/w_alm.npz', Sm_maps=sim, mask=None, lmax=lmax, nside=nside, n_iter=1)
+    obj_nilc = NILC.from_config("configs/beam.yaml", weights_name='./nilc_weight/w_alm.npz', Sm_maps=sim, mask=None, lmax=lmax, nside=nside, n_iter=1)
     clean_map = obj_nilc.run_nilc()
     np.save('./test_data_beam/cln_cmb_w_alm.npy', clean_map)
     print(f'{time.time()-time0=}')
@@ -82,22 +88,22 @@ def test_nilc_w_alm():
 def get_fg_res_w_alm():
     # this function tells you how to debias other component by using the weights in alm
     fg = np.load('./test_data_beam/sim_f.npy')
-    obj_nilc = NILC(bandinfo='./bandinfo_beam.csv', needlet_config='./needlets/beam_version.csv', weights_config='./nilc_weight/w_alm.npz', Sm_maps=fg, mask=None, lmax=lmax, nside=nside, n_iter=1)
+    obj_nilc = NILC.from_config("configs/beam.yaml", weights_config='./nilc_weight/w_alm.npz', Sm_maps=fg, mask=None, lmax=lmax, nside=nside, n_iter=1)
     fg_res = obj_nilc.run_nilc()
     np.save('./test_data_beam/fg_res_w_alm.npy', fg_res)
 
 def get_n_res_w_alm():
     # calc noise bias term
     noise = np.load('./test_data_beam/sim_n.npy')
-    obj_nilc = NILC(bandinfo='./bandinfo_beam.csv', needlet_config='./needlets/beam_version.csv', weights_config='./nilc_weight/w_alm.npz', Sm_maps=noise, mask=None, lmax=lmax, nside=nside, n_iter=1)
+    obj_nilc = NILC.from_config("configs/beam.yaml", weights_config='./nilc_weight/w_alm.npz', Sm_maps=noise, mask=None, lmax=lmax, nside=nside, n_iter=1)
     fg_res = obj_nilc.run_nilc()
     np.save('./test_data_beam/n_res_w_alm.npy', fg_res)
 
-def test_nilc_w_map():
+def run_nilc_w_map():
     # do nilc and save the weights in map
     time0 = time.time()
     sim = np.load('./test_data_beam/sim_cfn.npy')
-    obj_nilc = NILC(bandinfo='./bandinfo_beam.csv', needlet_config='./needlets/beam_version.csv', weights_name='./nilc_weight/w_map.npz', Sm_maps=sim, mask=None, lmax=lmax, nside=nside, n_iter=1, weight_in_alm=False)
+    obj_nilc = NILC.from_config("configs/beam.yaml", weights_name='./nilc_weight/w_map.npz', Sm_maps=sim, mask=None, lmax=lmax, nside=nside, n_iter=1, weight_in_alm=False)
     clean_map = obj_nilc.run_nilc()
     np.save('./test_data_beam/cln_cmb_w_map.npy', clean_map)
     print(f'{time.time()-time0=}')
@@ -105,14 +111,14 @@ def test_nilc_w_map():
 def get_fg_res_w_map():
     # this function tells you how to debias other component by using the weights in map
     fg = np.load('./test_data_beam/sim_f.npy')
-    obj_nilc = NILC(bandinfo='./bandinfo_beam.csv', needlet_config='./needlets/beam_version.csv', weights_config='./nilc_weight/w_map.npz', Sm_maps=fg, mask=None, lmax=lmax, nside=nside, n_iter=1, weight_in_alm=False)
+    obj_nilc = NILC.from_config("configs/beam.yaml", weights_config='./nilc_weight/w_map.npz', Sm_maps=fg, mask=None, lmax=lmax, nside=nside, n_iter=1, weight_in_alm=False)
     fg_res = obj_nilc.run_nilc()
     np.save('./test_data_beam/fg_res_w_map.npy', fg_res)
 
 def get_n_res_w_map():
     # noise bias term
     noise = np.load('./test_data_beam/sim_n.npy')
-    obj_nilc = NILC(bandinfo='./bandinfo_beam.csv', needlet_config='./needlets/beam_version.csv', weights_config='./nilc_weight/w_map.npz', Sm_maps=noise, mask=None, lmax=lmax, nside=nside, n_iter=1, weight_in_alm=False)
+    obj_nilc = NILC.from_config("configs/beam.yaml", weights_config='./nilc_weight/w_map.npz', Sm_maps=noise, mask=None, lmax=lmax, nside=nside, n_iter=1, weight_in_alm=False)
     fg_res = obj_nilc.run_nilc()
     np.save('./test_data_beam/n_res_w_map.npy', fg_res)
 
@@ -168,10 +174,10 @@ def main():
 
     gen_sim()
 
-    test_nilc_w_alm()
+    run_nilc_w_alm()
     get_fg_res_w_alm()
     get_n_res_w_alm()
-    test_nilc_w_map()
+    run_nilc_w_map()
     get_fg_res_w_map()
     get_n_res_w_map()
 

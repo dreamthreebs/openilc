@@ -1,68 +1,159 @@
 # OPENILC
-Internal linear combination for cmb data analysis
 
-## **NILC (Needlets Internal Linear Combination)**
+Internal Linear Combination tools for CMB data analysis.
 
-This repository provides tools for performing Needlets Internal Linear Combination (NILC). Below is an overview of the key components and guidelines for using them effectively.
+OPENILC is split into three layers:
 
-### **Components**
+- `openilc/`: the installable core package, currently exposing `NILC` and `HILC`.
+- External YAML configuration files under `configs/`.
+- Tutorial helpers and scripts under `tutorials/`.
 
-#### **1. Source Code**
-- **`nilc.py`**: The main module to perform NILC.
+This keeps the algorithm reusable while leaving experiment settings easy to edit.
 
-#### **2. Configuration Files**
-- **`./needlets`**:  
-  - Defines the cosine needlets configuration.  
-  - **Important Rules**:  
-    - Each row's `lmin` and `lpeak` must match the previous row's `lpeak` and `lmax`.
-    - The last `lmax` should match `lmax` in your NILC settings.  
-  - **Resolution Note**:  
-    Ensure your `nside` is greater than `lmax / 2` because different needlet bins may have varying resolutions. The calculations for `lmax` are valid only when `lmax < 2 * nside`.
+## Installation
 
-- **`./bandinfo.csv`**:  
-  - Experimental configuration file that includes parameters like frequency and beam.  
-  - Ensure `lmax_alm` is **greater than** your NILC `lmax`.  
-  - **Usage**: This file is primarily for testing the NILC effect **without beam corrections**.
+Install the core package in editable mode:
 
-- **`./bandinfo_beam.csv`**:  
-  - Experimental configuration file for cases considering beam corrections.  
-  - **Important Rules**:  
-    - Set `lmax_alm` carefully to avoid numerical errors at large `ell` values (e.g., for `beam=60`, `lmax_alm ~ 500`).  
-    - Ensure to use the bigger band-limited lmax (when you do deconvolve and convolve your map) than `lmax_alm`
+```bash
+pip install -e .
+```
 
-#### **3. Tutorials**
-- **`test_nilc.py`**:  
-  A basic (though currently incomplete) tutorial on using NILC.  
+For the tutorial simulations that generate CMB spectra with CAMB and foregrounds
+with PySM3, install the optional tutorial dependencies:
 
-- **`test_nilc_beam.py`**:  
-  A tutorial demonstrating how to perform NILC with beam considerations.
+```bash
+pip install -e ".[tutorial]"
+```
 
-### **Usage Guidelines**
-1. **Set up `./needlets` configuration**:  
-   Ensure consistency between `lmin`, `lpeak`, and `lmax` across rows and align with your NILC parameters.
+## Quick Start
 
-2. **Verify `nside`**:  
-   It should be at least `lmax / 2` for accurate results.
+```python
+import numpy as np
+from openilc import NILC
 
-3. **Check beam parameters**:  
-   When working with `./bandinfo_beam.csv`, account for potential numerical errors at high `ell`.
+maps = np.load("./test_data/sim_cfn.npy")
 
-4. **Run Tutorials**:  
-   Use the `test_nilc.py` and `test_nilc_beam.py` scripts to understand the process and verify your setup.
+nilc = NILC.from_config(
+    "configs/default.yaml",
+    weights_name="./nilc_weight/w_map.npz",
+    Sm_maps=maps,
+    n_iter=1,
+    weight_in_alm=False,
+)
 
+clean_map = nilc.run_nilc()
+```
 
-# KNOWN ISSUE
-* large memory usage in NILC
-* slow rate when calculating beta covariance matrix in NILC
+For beam-aware runs, use the beam configuration:
 
-# FUTURE PLAN
-* use pytest
-* add other ILC
+```python
+nilc = NILC.from_config(
+    "configs/beam.yaml",
+    Sm_maps=maps,
+    n_iter=1,
+)
+```
 
-# HIGH PERFORMANCE COMPUTATION
-SHT can be replace by other package or use healpy build from sources:
-* see https://github.com/healpy/healpy/blob/main/INSTALL.rst#generating-native-binaries first
-* download `cfitsio` version 4.5.0, then run ./configure --disable-curl;make;make install
-* download `healpix` version 3.8.3, configure with your `cfitsio` fitsio.h and cfitsio lib to build healpix cxx
-* add PKG_CONFIG_PATH for `cfitsio` and `healpix`
-* pip install --no-binary healpy healpy
+## Configuration
+
+Configuration is intentionally outside the Python package. YAML is the
+recommended format because it is readable, editable, and can include comments.
+
+- `configs/default.yaml`: basic NILC tutorial configuration.
+- `configs/beam.yaml`: beam-aware NILC tutorial configuration.
+
+Important rules:
+
+- The last needlet `lmax` should match the `lmax` passed to `NILC`.
+- Each needlet row should connect smoothly with neighboring rows through
+  `lmin`, `lpeak`, and `lmax`.
+- `nside` should be large enough for the requested `lmax`; in practice, keep
+  `lmax < 2 * nside`.
+- `lmax_alm` controls which channels are usable at each needlet scale. In
+  `NILC.calc_beta_for_scale`, channels with `lmax_alm < beta_lmax` are dropped.
+
+Recommended YAML usage:
+
+```python
+nilc = NILC.from_config(
+    "configs/beam.yaml",
+    Sm_maps=maps,
+    weights_name="./nilc_weight/w_alm.npz",
+    n_iter=1,
+)
+```
+
+## Simulated Data
+
+Large binary data is not stored in this repository. Tutorial simulations are
+generated at runtime by `tutorials/sim_data.py`:
+
+- CMB spectra: CAMB with Planck 2018-like parameters.
+- Foregrounds: PySM3 dust and synchrotron presets.
+- Noise: Gaussian pixel noise using the configured `nstd`.
+
+Useful helpers:
+
+```python
+from tutorials.sim_data import (
+    estimate_lmax_from_beam,
+    get_band_table,
+    get_cmb_cls,
+    get_foreground,
+)
+```
+
+`estimate_lmax_from_beam(beam_arcmin, lmax, bl_floor=1e-4)` is kept for teaching:
+it shows where a Gaussian beam transfer function becomes small enough that
+deconvolution is numerically risky. The actual beam tutorial still uses the
+configured `lmax_alm` from `configs/beam.yaml`.
+
+## Tutorials
+
+The tutorial scripts are examples, not pytest tests:
+
+- `tutorials/tutorial_nilc.py`: basic NILC example using `configs/default.yaml`.
+- `tutorials/tutorial_nilc_beam.py`: beam-aware NILC example using `configs/beam.yaml`.
+- `tutorials/tutorial_ilc_bias.py`: ILC bias tutorial.
+- `tutorials/tutorial_cpr_ilc.py`: CPR/HILC experiments.
+
+Typical workflow:
+
+```bash
+cd tutorials
+python tutorial_nilc.py
+python tutorial_nilc_beam.py
+```
+
+These scripts write generated arrays into ignored local directories such as
+`test_data/`, `test_data_beam/`, and `nilc_weight/`.
+
+## Tests
+
+Automated tests live under `tests/`:
+
+```bash
+python -m pytest tests
+```
+
+The tutorial scripts are named `tutorial_*.py` so pytest does not collect them as
+unit tests.
+
+## Import
+
+Use the package import path:
+
+```python
+from openilc import NILC, HILC
+```
+
+## Known Issues
+
+- NILC currently has large memory usage.
+- Calculating the beta covariance matrix can be slow.
+
+## High Performance Computing
+
+Spherical harmonic transforms can be accelerated by building `healpy` from
+optimized native libraries. See the healpy installation notes, then install
+`cfitsio`, `healpix`, and rebuild `healpy` from source if needed.

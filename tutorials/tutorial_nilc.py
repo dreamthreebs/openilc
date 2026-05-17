@@ -1,16 +1,18 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import healpy as hp
-import pandas as pd
 import time
 
 from pathlib import Path
-from nilc import NILC
 
-# ==== NEW: PySM imports ====
-import pysm3
-import pysm3.units as u
-# ===========================
+ROOT = Path(__file__).resolve().parents[1]
+import sys
+sys.path.insert(0, str(ROOT))
+import os
+os.chdir(ROOT)
+
+from openilc import NILC
+from tutorials.sim_data import get_band_table, get_cmb_cls, get_foreground
 
 nside = 512
 npix = hp.nside2npix(nside)
@@ -24,40 +26,29 @@ def gen_sim():
 
     - CMB: scalar T field from input Cl, no beam
     - FG: PySM3 Sky with dust d0 + synchrotron s0, unit uK_CMB, no beam
-    - Noise: Gaussian pixel noise with nstd from FreqBand5
+    - Noise: Gaussian pixel noise with configured nstd
     """
     sim_list = []
     fg_list = []
     n_list = []
 
-    df = pd.read_csv("./data/FreqBand5")
-    cl_cmb = np.load("./data/cmb/cmbcl_8k.npy").T[0]
+    bands = get_band_table()
+    cl_cmb = get_cmb_cls(lmax=8000).T[0]
     print(f"{cl_cmb.shape=}")
 
     # --- CMB simulation (T only) ---
     np.random.seed(seed=0)
     cmb = hp.synfast(cls=cl_cmb, nside=nside)
 
-    # --- NEW: build PySM sky with d0+s0 ---
-    # Output unit chosen to match CMB map units (uK_CMB)
-    sky = pysm3.Sky(
-        nside=nside,
-        preset_strings=["d1", "s1"],
-        output_unit="uK_CMB",
-    )
-
-    for freq_idx in range(len(df)):
-        freq = df.at[freq_idx, "freq"]  # in GHz
-        beam = df.at[freq_idx, "beam"]
+    for band in bands:
+        freq = band["freq"]  # in GHz
+        beam = band["beam"]
         print(f"{freq=}, {beam=}")
 
-        # --- NEW: foreground from PySM d0+s0 at this frequency ---
-        # sky.get_emission returns (I,Q,U) in uK_CMB as an astropy Quantity
-        fg_maps = sky.get_emission(freq * u.GHz)  # shape (3, npix)
-        fg = fg_maps[0].value  # use I only, drop units
+        fg = get_foreground(freq, nside)
 
         # --- Noise map ---
-        nstd = df.at[freq_idx, "nstd"]
+        nstd = band["nstd"]
         noise = nstd * np.random.normal(loc=0, scale=1, size=(npix,))
 
         # Combined channel map
@@ -74,12 +65,11 @@ def gen_sim():
     np.save("./test_data/sim_n.npy", np.array(n_list))
 
 
-def test_nilc_w_alm():
+def run_nilc_w_alm():
     # do nilc and save the weights in alm
     time0 = time.time()
     sim = np.load("./test_data/sim_cfn.npy")
-    obj_nilc = NILC(
-        needlet_config="./needlets/default.csv",
+    obj_nilc = NILC.from_config("configs/default.yaml",
         weights_name="./nilc_weight/w_alm.npz",
         Sm_maps=sim,
         mask=None,
@@ -96,8 +86,7 @@ def test_nilc_w_alm():
 def get_fg_res_w_alm():
     # this function tells you how to debias other component by using the weights in alm
     fg = np.load("./test_data/sim_f.npy")
-    obj_nilc = NILC(
-        needlet_config="./needlets/default.csv",
+    obj_nilc = NILC.from_config("configs/default.yaml",
         weights_config="./nilc_weight/w_alm.npz",
         Sm_maps=fg,
         mask=None,
@@ -112,8 +101,7 @@ def get_fg_res_w_alm():
 def get_n_res_w_alm():
     # calc noise bias
     noise = np.load("./test_data/sim_n.npy")
-    obj_nilc = NILC(
-        needlet_config="./needlets/default.csv",
+    obj_nilc = NILC.from_config("configs/default.yaml",
         weights_config="./nilc_weight/w_alm.npz",
         Sm_maps=noise,
         mask=None,
@@ -125,12 +113,11 @@ def get_n_res_w_alm():
     np.save("./test_data/n_res_w_alm.npy", fg_res)
 
 
-def test_nilc_w_map():
+def run_nilc_w_map():
     # do nilc and save the weights in map
     time0 = time.time()
     sim = np.load("./test_data/sim_cfn.npy")
-    obj_nilc = NILC(
-        needlet_config="./needlets/default.csv",
+    obj_nilc = NILC.from_config("configs/default.yaml",
         weights_name="./nilc_weight/w_map.npz",
         Sm_maps=sim,
         mask=None,
@@ -148,8 +135,7 @@ def test_nilc_w_map():
 def get_fg_res_w_map():
     # this function tells you how to debias other component by using the weights in map
     fg = np.load("./test_data/sim_f.npy")
-    obj_nilc = NILC(
-        needlet_config="./needlets/default.csv",
+    obj_nilc = NILC.from_config("configs/default.yaml",
         weights_config="./nilc_weight/w_map.npz",
         Sm_maps=fg,
         mask=None,
@@ -165,8 +151,7 @@ def get_fg_res_w_map():
 def get_n_res_w_map():
     # calc noise bias
     noise = np.load("./test_data/sim_n.npy")
-    obj_nilc = NILC(
-        needlet_config="./needlets/default.csv",
+    obj_nilc = NILC.from_config("configs/default.yaml",
         weights_config="./nilc_weight/w_map.npz",
         Sm_maps=noise,
         mask=None,
@@ -182,8 +167,7 @@ def get_n_res_w_map():
 def get_cmb_res_w_map():
     # calc noise bias
     cmb = np.asarray([np.load("./test_data/sim_c.npy")] * 5)
-    obj_nilc = NILC(
-        needlet_config="./needlets/default.csv",
+    obj_nilc = NILC.from_config("configs/default.yaml",
         weights_config="./nilc_weight/w_map.npz",
         Sm_maps=cmb,
         mask=None,
@@ -257,10 +241,10 @@ def check_res():
 def main():
     gen_sim()
 
-    test_nilc_w_alm()
+    run_nilc_w_alm()
     get_fg_res_w_alm()
     get_n_res_w_alm()
-    test_nilc_w_map()
+    run_nilc_w_map()
     get_fg_res_w_map()
     get_n_res_w_map()
 
